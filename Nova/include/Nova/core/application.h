@@ -8,6 +8,7 @@ typedef struct
     void (*onClose)(void);
     void (*onUpdate)(double frametime);
     NvWindowSettings windowSettings;
+    const char *name;
 } NvApplication;
 
 NV_API int NvApplicationRun(const NvApplication *app);

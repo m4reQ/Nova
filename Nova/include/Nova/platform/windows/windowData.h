@@ -4,6 +4,10 @@
 
 typedef struct
 {
+    HINSTANCE instance;
     HWND window;
-    bool shouldClose;
+    HICON icon;
+    WINDOWPLACEMENT savedPlacement;
+    DWORD originalStyle;
+    bool shouldClose, isFullscreen, isVisible;
 } NvWindowData;

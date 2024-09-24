@@ -19,6 +19,7 @@ int main(int argc, char **argv)
         .onLoad = EditorOnLoad,
         .onClose = EditorOnClose,
         .onUpdate = EditorOnUpdate,
+        .name = "NovaEditor",
         .windowSettings = {
             .width = 720,
             .height = 640,

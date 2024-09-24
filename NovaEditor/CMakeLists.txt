@@ -1,6 +1,6 @@
 project(NovaEditor LANGUAGES C)
 
-file(GLOB_RECURSE NOVA_EDITOR_SOURCES "src/*.c")
+file(GLOB_RECURSE NOVA_EDITOR_SOURCES CONFIGURE_DEPENDS "src/*.c")
 add_executable(NovaEditor ${NOVA_EDITOR_SOURCES})
 target_link_libraries(NovaEditor PUBLIC Nova)
 

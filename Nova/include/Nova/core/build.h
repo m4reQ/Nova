@@ -8,3 +8,5 @@
 #endif
 
 #define NV_ASSERT(cond, msg) assert(cond &&msg)
+
+#define IS_FLAG_SET(flags, flag) ((flags & flag) == flag)
