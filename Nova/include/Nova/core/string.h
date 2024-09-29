@@ -47,5 +47,6 @@ NV_API NvStringView NvStringReplace(const NvStringView sv, char from, char to);
 NV_API NvStringView NvStringSubstring(const NvStringView sv, size_t begin, int64_t end);
 NV_API char *NvStringConcat(size_t partsCount, NvStringView *parts, NvAllocator *allocator);
 NV_API bool NvStringStartsWithChar(const NvStringView sv, char value);
+NV_API bool NvStringStartsWith(const NvStringView sv, const NvStringView other);
 NV_API bool NvStringEndsWithChar(const NvStringView sv, char value);
 NV_API bool NvStringIsEmpty(const NvStringView sv);

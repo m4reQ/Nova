@@ -10,7 +10,7 @@
 NvStringView NvStringLStrip(const NvStringView sv)
 {
     if (SV_EMPTY(sv))
-        return SV_MAKE_EMPTY;
+        return sv;
 
     char *ptr = sv.data;
     size_t newLength = sv.length;
@@ -188,7 +188,7 @@ NvStringView NvStringChopLeft(const NvStringView sv, size_t count)
     if (count < 0)
         return sv;
 
-    char *new = (sv.data + count - 1);
+    char *new = (sv.data + count);
 
     return (NvStringView){
         .data = new,
@@ -318,4 +318,18 @@ bool NvStringIsEmpty(const NvStringView sv)
             return false;
 
     return true;
+}
+
+bool NvStringStartsWith(const NvStringView sv, const NvStringView other)
+{
+    if (SV_EMPTY(other))
+        return true;
+
+    if (SV_EMPTY(sv) && !SV_EMPTY(other))
+        return false;
+
+    if (sv.length < other.length)
+        return false;
+
+    return !strncmp(sv.data, other.data, other.length);
 }

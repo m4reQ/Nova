@@ -132,7 +132,7 @@ size_t NvArenaGetSize(NvArena *arena)
         current = current->next;
     }
 
-    return size;
+    return size * sizeof(uintptr_t);
 }
 
 NvAllocator NvArenaGetAllocator(NvArena *arena)
