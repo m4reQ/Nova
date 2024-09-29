@@ -41,6 +41,7 @@ NV_API bool NvStringTryParseFloat(const NvStringView sv, float *out);
 NV_API bool NvStringTryParseDouble(const NvStringView sv, double *out);
 NV_API NvStringView NvStringChopLeft(const NvStringView sv, size_t count);
 NV_API NvStringView NvStringChopRight(const NvStringView sv, size_t count);
+NV_API NvStringView NvStringChopUntil(const NvStringView sv, bool (*predicate)(char), size_t *choppedCount);
 NV_API bool NvStringContains(const NvStringView sv, char character);
 NV_API bool NvStringContainsAny(const NvStringView sv, const NvStringView characters);
 NV_API NvStringView NvStringReplace(const NvStringView sv, char from, char to);

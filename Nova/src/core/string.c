@@ -333,3 +333,28 @@ bool NvStringStartsWith(const NvStringView sv, const NvStringView other)
 
     return !strncmp(sv.data, other.data, other.length);
 }
+
+NvStringView NvStringChopUntil(const NvStringView sv, bool (*predicate)(char), size_t *choppedCount)
+{
+    NV_ASSERT(predicate != NULL, "Predicate function pointer must not be NULL");
+
+    if (SV_EMPTY(sv))
+    {
+        if (choppedCount)
+            *choppedCount = 0;
+
+        return sv;
+    }
+
+    size_t offset = 0;
+    while (sv.length > offset && predicate(sv.data[offset]))
+        offset++;
+
+    if (choppedCount)
+        *choppedCount = offset;
+
+    return (NvStringView){
+        .data = sv.data + offset,
+        .length = sv.length - offset,
+    };
+}
