@@ -1,4 +1,4 @@
-#include <Nova/core/file.h>
+#include <Nova/io/file.h>
 #include <io.h>
 #include <Windows.h>
 
@@ -6,8 +6,9 @@ size_t _NvFileGetSize(FILE *file)
 {
     HANDLE handle = (HANDLE)_get_osfhandle(fileno(file));
 
-    DWORD fileSizeHigh = 0;
-    DWORD fileSizeLow = GetFileSize(handle, &fileSizeHigh);
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(handle, &fileSize))
+        return -1;
 
-    return (size_t)fileSizeLow | ((size_t)fileSizeHigh << 32);
+    return (size_t)fileSize.QuadPart;
 }

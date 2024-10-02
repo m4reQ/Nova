@@ -9,9 +9,9 @@
 // TODO Implement wide char API
 
 #define NV_SV(x) \
-    (NvStringView) { .data = x, .length = strlen(x) }
+    (NvStringView) { .data = x, .length = x ? strlen(x) : 0 }
 #define NV_WSV(x) \
-    (NvWStringView) { .data = x, .length = wcslen(x) }
+    (NvWStringView) { .data = x, .length = x ? wcslen(x) : 0 }
 
 typedef struct
 {
