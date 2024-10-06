@@ -16,6 +16,11 @@ target_include_directories(Nova PUBLIC "include")
 target_compile_definitions(Nova PRIVATE "NV_BUILD")
 target_link_libraries(Nova PUBLIC stb volk)
 
+set(NOVA_PCH "<string.h>" "<stdint.h>" "<stdlib.h>" "<stdio.h>" "<math.h>" "<stdbool.h>")
+
 if(WIN32)
+    list(APPEND NOVA_PCH "<Windows.h>")
     target_compile_definitions(Nova PUBLIC "WIN32_LEAN_AND_MEAN" "NV_WINDOWS")
 endif()
+
+target_precompile_headers(Nova PUBLIC ${NOVA_PCH})
