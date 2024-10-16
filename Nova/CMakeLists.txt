@@ -14,7 +14,7 @@ endif()
 add_library(Nova SHARED ${NOVA_SOURCES})
 target_include_directories(Nova PUBLIC "include")
 target_compile_definitions(Nova PRIVATE "NV_BUILD")
-target_link_libraries(Nova PUBLIC stb volk)
+target_link_libraries(Nova PUBLIC stb volk dotnet Shell32 Shlwapi)
 
 set(NOVA_PCH "<string.h>" "<stdint.h>" "<stdlib.h>" "<stdio.h>" "<math.h>" "<stdbool.h>")
 
