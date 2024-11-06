@@ -1,4 +1,6 @@
 #pragma once
+#include <Nova/core/build.h>
+#include <Nova/core/memory.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -15,10 +17,10 @@ typedef struct
     bool shouldDispose, isDisposed;
 } NvInteropString;
 
-NvInteropString NvInteropStringCreateStack(const char *string);
-NvInteropString NvInteropStringCreateStackW(const wchar_t *string);
-NvInteropString NvInteropStringCreateGlobal(const char *string);
-NvInteropString NvInteropStringCreateGlobalW(const wchar_t *string);
-void NvInteropStringFree(NvInteropString *string);
-char *NvInteropStringDup(const NvInteropString *string);
-wchar_t *NvInteropStringDupW(const NvInteropString *string);
+NV_API NvInteropString NvInteropStringCreateStack(const char *string);
+NV_API NvInteropString NvInteropStringCreateStackW(const wchar_t *string);
+NV_API NvInteropString NvInteropStringCreateGlobal(const char *string);
+NV_API NvInteropString NvInteropStringCreateGlobalW(const wchar_t *string);
+NV_API char *NvInteropStringMoveToLocal(NvInteropString *string, NvAllocator *allocator);
+NV_API wchar_t *NvInteropStringMoveToLocalW(NvInteropString *string, NvAllocator *allocator);
+NV_API void NvInteropStringFree(NvInteropString *string);

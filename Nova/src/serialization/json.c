@@ -64,7 +64,7 @@ static char *TryParseStringLiteral(NvStream *stream, NvAllocator *allocator, siz
 
     NvStreamSetPos(stream, -(strLength + 1), true);
 
-    char *str = NV_ALLOCATOR_MALLOC(allocator, sizeof(char) * (strLength + 1));
+    char *str = NvMemoryAllocatorMalloc(allocator, sizeof(char) * (strLength + 1));
     str[strLength] = '\0';
 
     size_t bytesRead;
@@ -248,7 +248,7 @@ static ParseResult TryParseJsonArray(NvStream *stream, NvJsonObject *out, NvAllo
 
     size_t arrayCapacity = INITIAL_ARRAY_LENGTH;
     size_t arraySize = 0;
-    NvJsonObject *arrayData = NV_ALLOCATOR_MALLOC(allocator, sizeof(NvJsonObject) * arrayCapacity);
+    NvJsonObject *arrayData = NvMemoryAllocatorMalloc(allocator, sizeof(NvJsonObject) * arrayCapacity);
 
     while (true)
     {
@@ -273,7 +273,7 @@ static ParseResult TryParseJsonArray(NvStream *stream, NvJsonObject *out, NvAllo
         if (arraySize >= arrayCapacity)
         {
             arrayCapacity *= ARRAY_GROWTH_FACTOR;
-            arrayData = NV_ALLOCATOR_REALLOC(allocator, arrayData, sizeof(NvJsonObject) * arrayCapacity);
+            arrayData = NvMemoryAllocatorRealloc(allocator, arrayData, sizeof(NvJsonObject) * arrayCapacity);
         }
     }
 

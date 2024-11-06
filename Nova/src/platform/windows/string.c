@@ -22,7 +22,7 @@ wchar_t *NvStringToWide(const NvStringView sv, NvAllocator *allocator)
         -1,
         NULL,
         0);
-    wchar_t *result = NV_ALLOCATOR_MALLOC(allocator, requiredSize);
+    wchar_t *result = NvMemoryAllocatorMalloc(allocator, requiredSize);
     int bytesWritten = MultiByteToWideChar(
         CP_UTF8,
         0,

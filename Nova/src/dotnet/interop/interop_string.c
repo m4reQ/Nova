@@ -57,12 +57,34 @@ void NvInteropStringFree(NvInteropString *string)
     string->isDisposed = true;
 }
 
-char *NvInteropStringDup(const NvInteropString *string)
+char *NvInteropStringMoveToLocal(NvInteropString *string, NvAllocator *allocator)
 {
-    return strdup(string->data);
+    if (string->isDisposed)
+        return NULL;
+
+    const size_t length = strlen(string->data);
+    char *dataLocal = NvMemoryAllocatorMalloc(allocator, (length + 1) * sizeof(char));
+
+    memcpy(dataLocal, string->data, length * sizeof(char));
+    dataLocal[length] = '\0';
+
+    NvInteropStringFree(string);
+
+    return dataLocal;
 }
 
-wchar_t *NvInteropStringDupW(const NvInteropString *string)
+wchar_t *NvInteropStringMoveToLocalW(NvInteropString *string, NvAllocator *allocator)
 {
-    return wcsdup(string->data);
+    if (string->isDisposed)
+        return NULL;
+
+    const size_t length = wcslen(string->data);
+    wchar_t *dataLocal = NvMemoryAllocatorMalloc(allocator, (length + 1) * sizeof(wchar_t));
+
+    memcpy(dataLocal, string->data, length * sizeof(wchar_t));
+    dataLocal[length] = L'\0';
+
+    NvInteropStringFree(string);
+
+    return dataLocal;
 }

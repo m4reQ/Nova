@@ -1,4 +1,5 @@
 #include <Nova/core/arena.h>
+#include <Nova/core/memory.h>
 #include <stdlib.h>
 #include <memory.h>
 
@@ -37,7 +38,8 @@ static NvArenaRegion *GetFirstSuitableRegion(const NvArena *arena, size_t sizePa
 
 static NvArenaRegion *CreateNewRegion(size_t capacityPages)
 {
-    NvArenaRegion *region = _NvMemoryRawMalloc(sizeof(NvArenaRegion) + sizeof(uintptr_t) * capacityPages);
+    // TODO Introduce NvMemoryPlatformMalloc that will allow to get around stdlib allocator
+    NvArenaRegion *region = NvMemoryRawMalloc(sizeof(NvArenaRegion) + sizeof(uintptr_t) * capacityPages);
     *region = (NvArenaRegion){
         .capacity = capacityPages,
         .size = 0,
@@ -143,5 +145,6 @@ NvAllocator NvArenaGetAllocator(NvArena *arena)
         .calloc = AllocatorCalloc,
         .realloc = AllocatorRealloc,
         .data = arena,
+        .type = NV_ALLOCATOR_ARENA,
     };
 }

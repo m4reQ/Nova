@@ -5,7 +5,7 @@
 
 #define SV_EMPTY(x) (x.data == NULL || x.length == 0)
 #define SV_MAKE_EMPTY \
-    (NvStringView) { 0 }
+    (NvStringView){0}
 
 NvStringView NvStringLStrip(const NvStringView sv)
 {
@@ -86,7 +86,7 @@ char *NvStringDuplicate(const NvStringView sv, NvAllocator *allocator)
         return NULL;
 
     size_t size = sizeof(char) * (sv.length + 1);
-    char *buffer = NV_ALLOCATOR_MALLOC(allocator, size);
+    char *buffer = NvMemoryAllocatorMalloc(allocator, size);
     memcpy(buffer, sv.data, size);
 
     return buffer;
@@ -280,7 +280,7 @@ char *NvStringConcat(size_t partsCount, NvStringView *parts, NvAllocator *alloca
         requiredBufferLength += parts[i].length;
 
     size_t bufferSize = requiredBufferLength * sizeof(char);
-    char *buffer = NV_ALLOCATOR_MALLOC(allocator, bufferSize);
+    char *buffer = NvMemoryAllocatorMalloc(allocator, bufferSize);
 
     size_t currentOffset = 0;
     for (size_t i = 0; i < partsCount; i++)
