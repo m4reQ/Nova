@@ -1,2 +1,7 @@
-build
-.vscode
+build/
+out/
+.vs/
+.vscode/
+**/*.vcxproj*
+**/cpp.hint
+**/*.sln

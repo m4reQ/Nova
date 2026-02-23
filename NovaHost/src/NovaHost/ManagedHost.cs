@@ -36,6 +36,30 @@ internal static class ManagedHost
         }
     }
 
+    [Conditional("DEBUG")]
+    internal static void LogTrace(string message)
+    {
+        LogMessage(LogLevel.Trace, message);
+    }
+
+    [Conditional("DEBUG")]
+    internal static void LogInfo(string message)
+    {
+        LogMessage(LogLevel.Info, message);
+    }
+
+    [Conditional("DEBUG")]
+    internal static void LogWarning(string message)
+    {
+        LogMessage(LogLevel.Warning, message);
+    }
+
+    [Conditional("DEBUG")]
+    internal static void LogError(string message)
+    {
+        LogMessage(LogLevel.Error, message);
+    }
+
     internal static void HandleException(Exception exc, bool isFatal = false)
     {
         unsafe

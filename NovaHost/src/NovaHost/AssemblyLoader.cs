@@ -3,198 +3,90 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Loader;
 using NovaHost.Interop;
 
 namespace NovaHost;
 
-internal struct AssemblyInfo
-{
-    NativeString Name { get; set; }
-    NativeString FullName { get; set; }
-
-}
-
 internal static class AssemblyLoader
 {
-    private static readonly Dictionary<NativeString, AssemblyLoadContext> LoadContexts = new()
-    {
-        { new("default"), AssemblyLoadContext.Default },
-    };
-    private static readonly Dictionary<int, Assembly> Assemblies = new();
+    static private readonly Dictionary<int, Assembly> AssembliesCache = [];
 
     [UnmanagedCallersOnly]
-    private static int LoadAssemblyFromFilepath(NativeString filepath, NativeString contextName)
+    private static unsafe nint GetAssemblyTypes(int assemblyID)
     {
-        try
+        ManagedHost.LogTrace($"Getting types from assembly with ID {assemblyID}...");
+
+        if (!AssembliesCache.TryGetValue(assemblyID, out Assembly? assembly))
         {
-            ThrowIfNullOrEmpty(filepath, "Filepath cannot be null.", nameof(filepath));
-            ThrowIfNullOrEmpty(contextName, "Context name cannot be null.", nameof(contextName));
-
-            if (!LoadContexts.TryGetValue(contextName, out var ctx))
-            {
-                ctx = CreateLoadContext(contextName);
-            }
-
-            // TODO remove allocation by using custom mapped file with constructor accepting IntPtr
-            var filepathStr = Path.GetFullPath(filepath.GetString(Encoding.Unicode)!);
-
-            var assembly = ctx.LoadFromAssemblyPath(filepathStr);
-            var assemblyId = assembly.GetHashCode();
-
-            Assemblies.Add(assemblyId, assembly);
-
-            ManagedHost.LogMessage(LogLevel.Info, $"Loaded assembly from filepath {filepathStr}. Assembly id: {assemblyId}");
-
-            return assemblyId;
+            ManagedHost.LogError($"Failed to find any cached assembly with for ID {assemblyID}.");
+            return 0;
         }
-        catch (Exception exc)
+
+        ManagedHost.LogTrace($"Found cached assembly \"{assembly.GetName().Name}\".");
+
+        var types = assembly.GetExportedTypes()
+            .Select(
+                x => new AssemblyType
+                {
+                    Name = Marshal.StringToHGlobalAnsi(x.Name),
+                    FullName = Marshal.StringToHGlobalAnsi(x.FullName),
+                    AssemblyQualifiedName = Marshal.StringToHGlobalAnsi(x.AssemblyQualifiedName),
+                    ID = x.GetHashCode(),
+                })
+            .ToArray();
+
+        if (types.Length == 0)
         {
-            ManagedHost.HandleException(exc);
-            return -1;
+            ManagedHost.LogWarning("Didn't find any exported types for the given assembly.");
         }
-    }
-
-    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static void UnloadContext(NativeString contextName)
-    {
-        try
+        else
         {
-            ThrowIfNullOrEmpty(contextName, "Context name cannot be null.", nameof(contextName));
-
-            if (!LoadContexts.TryGetValue(contextName, out var ctx))
-            {
-                ManagedHost.LogMessage(LogLevel.Error, $"Couldn't find context named {contextName.GetString(Encoding.Ansi)}.");
-                return;
-            }
-
-            ctx.Unload();
-
-            ManagedHost.LogMessage(LogLevel.Info, $"Unloaded assembly load context named {contextName.GetString()}");
+            var suffix = types.Length > 1 ? "s" : "";
+            ManagedHost.LogTrace($"Found {types.Length} exported type{suffix}.");
         }
-        catch (Exception exc)
+
+        var bufferSize = Marshal.SizeOf<AssemblyType>() * types.Length;
+        var buffer = Marshal.AllocHGlobal(bufferSize);
+        fixed (AssemblyType* typesPtr = types)
         {
-            ManagedHost.HandleException(exc);
+            Buffer.MemoryCopy(
+                typesPtr,
+                buffer.ToPointer(),
+                bufferSize,
+                bufferSize);
         }
+
+        return buffer;
     }
 
     [UnmanagedCallersOnly]
-    private static int GetAssemblyID(NativeString assemblyName, NativeString contextName)
+    private static AssemblyInfo LoadAssemblyFromFilepath(NativeString filepath)
     {
+        var managedFilepath = Path.GetFullPath(filepath.GetString(Encoding.Unicode));
+
+        Assembly? assembly;
         try
         {
-            ThrowIfNullOrEmpty(assemblyName, "Assembly name cannot be null.", nameof(assemblyName));
-            ThrowIfNullOrEmpty(contextName, "Context name cannot be null.", nameof(contextName));
-
-            if (!LoadContexts.TryGetValue(contextName, out var ctx))
-                throw new Exception($"Context named {contextName.GetString()} not found.");
-
-            var assembly = ctx.Assemblies.First(x => contextName.Equals(x.GetName().Name.AsSpan()));
-            return assembly.GetHashCode();
-        }
-        catch (Exception exc)
-        {
-            ManagedHost.HandleException(exc);
-            return -1;
-        }
-    }
-
-    [UnmanagedCallersOnly]
-    private static NativeString GetAssemblyName(int assemblyId)
-    {
-        try
-        {
-            if (!Assemblies.TryGetValue(assemblyId, out var assembly))
-                throw new Exception($"Assembly with id {assemblyId} not found.");
-
-            return new(assembly.GetName().Name);
-        }
-        catch (Exception exc)
-        {
-            ManagedHost.HandleException(exc);
-            return NativeString.Empty;
-        }
-    }
-
-    [UnmanagedCallersOnly]
-    private static NativeString GetAssemblyFullName(int assemblyId)
-    {
-        try
-        {
-            if (!Assemblies.TryGetValue(assemblyId, out var assembly))
-                throw new Exception($"Assembly with id {assemblyId} not found.");
-
-            return new(assembly.GetName().FullName);
-        }
-        catch (Exception exc)
-        {
-            ManagedHost.HandleException(exc);
-            return NativeString.Empty;
-        }
-    }
-
-    [UnmanagedCallersOnly]
-    private static void ReloadContext(NativeString contextName)
-    {
-        try
-        {
-            ThrowIfNullOrEmpty(contextName, "Context name cannot be null.", nameof(contextName));
-
-            if (!LoadContexts.TryGetValue(contextName, out var ctx))
+            assembly = Assembly.LoadFrom(managedFilepath);
+            if (assembly is null)
             {
-                ManagedHost.LogMessage(LogLevel.Error, $"Couldn't find load context named {contextName.GetString(Encoding.Ansi)}");
-                return;
-            }
-
-            if (!ctx.IsCollectible)
-                throw new Exception("Context is not collectible.");
-
-            var assemblyPaths = ctx.Assemblies
-                .Select(x => x.Location)
-                .ToArray();
-            var assemblyRefs = ctx.Assemblies
-                .Select(x => new WeakReference(x))
-                .ToArray();
-
-            ctx.Unload();
-
-            foreach (var assemblyRef in assemblyRefs)
-            {
-                Assemblies.Remove(assemblyRef.Target.GetHashCode());
-
-                while (assemblyRef.IsAlive) { }
-
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-            }
-
-            foreach (var assemblyPath in assemblyPaths)
-            {
-                var assembly = ctx.LoadFromAssemblyPath(assemblyPath);
-                Assemblies.Add(assembly.GetHashCode(), assembly);
+                return AssemblyInfo.Invalid;
             }
         }
-        catch (Exception exc)
+        catch (Exception)
         {
-            ManagedHost.HandleException(exc);
+            return AssemblyInfo.Invalid;
         }
-    }
 
-    private static AssemblyLoadContext CreateLoadContext(string name)
-    {
-        return new(name, true);
-    }
+        AssembliesCache.Add(assembly.GetHashCode(), assembly);
 
-    private static AssemblyLoadContext CreateLoadContext(NativeString name)
-    {
-        return new(name.GetString(Encoding.Ansi), true);
-    }
-
-    private static void ThrowIfNullOrEmpty(NativeString str, string? msg, string? argName)
-    {
-        if (str.IsNull)
-            throw new ArgumentException(msg, argName);
+        return new AssemblyInfo
+        {
+            Name = Marshal.StringToHGlobalAnsi(assembly.GetName().Name),
+            FullName = Marshal.StringToHGlobalAnsi(assembly.GetName().FullName),
+            Filepath = Marshal.StringToHGlobalAnsi(managedFilepath),
+            ID = assembly.GetHashCode(),
+        };
     }
 }

@@ -5,7 +5,7 @@ public readonly struct NativeBool
 {
     private byte Value { get; init; }
 
-    NativeBool(bool value)
+    public NativeBool(bool value)
     {
         Value = value ? (byte)1 : (byte)0;
     }

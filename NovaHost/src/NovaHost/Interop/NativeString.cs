@@ -5,7 +5,6 @@ namespace NovaHost.Interop;
 
 public enum Encoding
 {
-    Auto = 0,
     Ansi = 1,
     Unicode = 2,
 }
@@ -16,21 +15,38 @@ public struct NativeString : IDisposable, IEquatable<NativeString>
     private NativeBool ShouldDispose { get; set; }
     private NativeBool IsDisposed { get; set; } = false;
 
+    public readonly bool IsNull => Data == IntPtr.Zero;
+
+    public static NativeString Empty => new(IntPtr.Zero);
+
     public NativeString(IntPtr data)
     {
-        Data = data;
         ShouldDispose = false;
+        Data = data;
     }
 
-    public NativeString(string? data, Encoding encoding = Encoding.Ansi)
+    public NativeString(string data, Encoding encoding = Encoding.Ansi)
     {
-        Data = StringToHGlobal(data, encoding);
         ShouldDispose = true;
+        Data = encoding switch
+        {
+            Encoding.Ansi => Marshal.StringToHGlobalAnsi(data),
+            Encoding.Unicode => Marshal.StringToHGlobalUni(data),
+            _ => throw new Exception("Invalid encoding."),
+        };
     }
 
-    public readonly string? GetString(Encoding encoding = Encoding.Ansi)
+    public string GetString(Encoding encoding = Encoding.Ansi)
     {
-        return PtrToString(Data, encoding);
+        if (Data == 0)
+            return string.Empty;
+
+        return encoding switch
+        {
+            Encoding.Ansi => Marshal.PtrToStringAnsi(Data)!,
+            Encoding.Unicode => Marshal.PtrToStringUni(Data)!,
+            _ => throw new Exception("Invalid encoding."),
+        };
     }
 
     public readonly void Dispose()
@@ -96,31 +112,5 @@ public struct NativeString : IDisposable, IEquatable<NativeString>
         }
 
         return result;
-    }
-
-    public readonly bool IsNull => Data == IntPtr.Zero;
-
-    public static NativeString Empty => new(IntPtr.Zero);
-
-    private static IntPtr StringToHGlobal(string data, Encoding encoding)
-    {
-        return encoding switch
-        {
-            Encoding.Ansi => Marshal.StringToHGlobalAnsi(data),
-            Encoding.Auto => Marshal.StringToHGlobalAuto(data),
-            Encoding.Unicode => Marshal.StringToHGlobalUni(data),
-            _ => throw new Exception($"Invalid encoding value: {encoding}."),
-        };
-    }
-
-    private static string? PtrToString(IntPtr data, Encoding encoding)
-    {
-        return encoding switch
-        {
-            Encoding.Ansi => Marshal.PtrToStringAnsi(data),
-            Encoding.Auto => Marshal.PtrToStringAuto(data),
-            Encoding.Unicode => Marshal.PtrToStringUni(data),
-            _ => throw new Exception($"Invalid encoding value: {encoding}."),
-        };
     }
 }

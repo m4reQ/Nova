@@ -1,18 +1,25 @@
-cmake_minimum_required(VERSION 3.8.2)
+cmake_minimum_required(VERSION 3.22)
 
 project(NovaHost LANGUAGES CSharp)
 
-set(CMAKE_VS_NUGET_PACKAGE_RESTORE ON)
-
-file(GLOB_RECURSE NOVAHOST_SOURCES CONFIGURE_DEPENDS "src/*.cs")
-add_library(NovaHost SHARED ${NOVAHOST_SOURCES})
-# FIXME For some reason /nullable flag doesn't work, probably bcs it expects <Nullable> tag inside csproj
-target_compile_options(NovaHost PRIVATE "/langversion:latest" "/unsafe" "/nullable")
+file(
+    GLOB_RECURSE
+    NOVAHOST_SOURCES
+    CONFIGURE_DEPENDS
+    "src/*.cs")
+add_library(
+    NovaHost
+    SHARED
+    ${NOVAHOST_SOURCES})
+target_compile_options(
+    NovaHost
+    PRIVATE
+    "/langversion:latest"
+    "/unsafe"
+    "-debug:portable")
 set_target_properties(
-    NovaHost PROPERTIES
-    DOTNET_TARGET_FRAMEWORK "net8.0"
+    NovaHost
+    PROPERTIES
+    VS_GLOBAL_Nullable "enable"
     DOTNET_SDK "Microsoft.NET.Sdk"
-    VS_DOTNET_REFERENCES "System;System.Runtime.InteropServices")
-
-# TODO Find a way to automatically run `dotnet restore` before build
-# TODO Find a way to copy runtimeconfig.json file to output directory
+    DOTNET_TARGET_FRAMEWORK "net9.0")
