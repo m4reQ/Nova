@@ -15,14 +15,9 @@ void Nova::Log::_Initialize(const std::optional<std::filesystem::path> logFilepa
 		std::make_shared<spdlog::sinks::stdout_color_sink_mt>(),
 	};
 
-	// TODO Fix bug with file open
-#if 0
 	if (logFilepath.has_value())
-	{
 		sinks.emplace_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>(logFilepath.value().string(), true));
-	}
-#endif
-
+	
 	s_Logger = std::make_shared<spdlog::logger>("NOVA", sinks.begin(), sinks.end());
 	s_Logger->set_pattern("%^[%l][%H:%M:%S.%e] %v%$");
 	s_Logger->set_level(spdlog::level::trace);
