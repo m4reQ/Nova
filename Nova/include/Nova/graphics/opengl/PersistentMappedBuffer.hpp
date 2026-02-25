@@ -1,6 +1,6 @@
 #pragma once
 #include <Nova/core/Utility.hpp>
-#include <glad/gl.h>
+#include <Nova/graphics/opengl/GL.hpp>
 #include <utility>
 #include <span>
 
@@ -45,14 +45,22 @@ namespace Nova
         {
             if constexpr (std::is_trivially_copyable_v<T>)
             {
-                *(T*)dataCurrent_ = value;
-                dataCurrent_ = (uint8_t)dataCurrent_ + sizeof(T);
+                *static_cast<T*>(dataCurrent_) = value;
+                dataCurrent_ = static_cast<uint8_t*>(dataCurrent_) + sizeof(T);
             }
             else
             {
                 Write(&value, sizeof(T));
             }
         }
+
+        void Bind(BufferBindTarget target) const noexcept;
+
+        void Bind(BufferBaseTarget target, GLuint index) const noexcept;
+
+        void Bind(BufferBaseTarget target, GLuint index, GLintptr offset, GLsizeiptr size) const noexcept;
+
+        void SetDebugName(const std::string_view debugName) const noexcept;
 
         constexpr GLuint GetID() const noexcept { return id_; }
 
