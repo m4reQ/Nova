@@ -48,6 +48,12 @@ GLsizeiptr PersistentMappedBuffer::Commit() noexcept
     return flushedDataSize;
 }
 
+void PersistentMappedBuffer::Commit(GLintptr offset, GLsizeiptr length) noexcept
+{
+    NV_PROFILE_FUNC;
+    glFlushMappedNamedBufferRange(id_, offset, length);
+}
+
 void PersistentMappedBuffer::Discard() noexcept
 {
     dataCurrent_ = dataBase_;

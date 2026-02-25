@@ -34,6 +34,8 @@ namespace Nova
 
         GLsizeiptr Commit() noexcept;
 
+        void Commit(GLintptr offset, GLsizeiptr length) noexcept;
+
         void Discard() noexcept;
 
         void Write(const void* data, GLsizeiptr dataSize) noexcept;
