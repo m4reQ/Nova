@@ -378,6 +378,171 @@ namespace Nova
         TransformFeedbackBufferStride = GL_TRANSFORM_FEEDBACK_BUFFER_STRIDE,
     };
 
+    enum class BufferBaseTarget : GLenum
+    {
+        AtomicCounterBuffer = GL_ATOMIC_COUNTER_BUFFER,
+        TransformFeedbackBuffer = GL_TRANSFORM_FEEDBACK_BUFFER,
+        UniformBuffer = GL_UNIFORM_BUFFER,
+        ShaderStorageBuffer =  GL_SHADER_STORAGE_BUFFER,
+    };
+
+    enum class BufferBindTarget : GLenum
+    {
+        ArrayBuffer = GL_ARRAY_BUFFER,
+        AtomicCounterBuffer = GL_ATOMIC_COUNTER_BUFFER,
+        CopyReadBuffer = GL_COPY_READ_BUFFER,
+        CopyWriteBuffer = GL_COPY_WRITE_BUFFER,
+        DispatchIndirectBuffer = GL_DISPATCH_INDIRECT_BUFFER,
+        DrawIndirectBuffer = GL_DRAW_INDIRECT_BUFFER,
+        ElementArrayBuffer = GL_ELEMENT_ARRAY_BUFFER,
+        PixelPackBuffer = GL_PIXEL_PACK_BUFFER,
+        PixelUnpackBUffer = GL_PIXEL_UNPACK_BUFFER,
+        QueryBuffer = GL_QUERY_BUFFER,
+        ShaderStorageBuffer = GL_SHADER_STORAGE_BUFFER,
+        TextureBuffer = GL_TEXTURE_BUFFER,
+        TransformFeedbackBuffer = GL_TRANSFORM_FEEDBACK_BUFFER,
+        UniformBuffer = GL_UNIFORM_BUFFER,
+    };
+
+    enum class EnableCap : GLenum
+    {
+        /// @brief If enabled, blend the computed fragment color values with the values in the color buffers.
+        /// See glBlendFunc.
+        Blend = GL_BLEND,
+
+        /// @brief If enabled, clip geometry against user-defined half space i.
+        ClipDistance0 = GL_CLIP_DISTANCE0,
+
+        /// @brief If enabled, clip geometry against user-defined half space i.
+        ClipDistance1 = GL_CLIP_DISTANCE1,
+
+        /// @brief If enabled, clip geometry against user-defined half space i.
+        ClipDistance2 = GL_CLIP_DISTANCE2,
+
+        /// @brief If enabled, clip geometry against user-defined half space i.
+        ClipDistance3 = GL_CLIP_DISTANCE3,
+
+        /// @brief If enabled, clip geometry against user-defined half space i.
+        ClipDistance4 = GL_CLIP_DISTANCE4,
+
+        /// @brief If enabled, clip geometry against user-defined half space i.
+        ClipDistance5 = GL_CLIP_DISTANCE5,
+
+        /// @brief If enabled, clip geometry against user-defined half space i.
+        ClipDistance6 = GL_CLIP_DISTANCE6,
+
+        /// @brief If enabled, clip geometry against user-defined half space i.
+        ClipDistance7 = GL_CLIP_DISTANCE7,
+
+        /// @brief If enabled, apply the currently selected logical operation to the computed fragment color and color buffer values.
+        /// See glLogicOp.
+        ColorLogicOp = GL_COLOR_LOGIC_OP,
+
+        /// @brief If enabled, cull polygons based on their winding in window coordinates.
+        /// See glCullFace.
+        CullFace = GL_CULL_FACE,
+
+        /// @brief If enabled, debug messages are produced by a debug context.
+        /// When disabled, the debug message log is silenced.
+        /// Note that in a non-debug context, very few, if any messages might be produced, even when GL_DEBUG_OUTPUT is enabled.
+        DebugOutput = GL_DEBUG_OUTPUT,
+
+        /// @brief If enabled, debug messages are produced synchronously by a debug context.
+        // If disabled, debug messages may be produced asynchronously.
+        // In particular, they may be delayed relative to the execution of GL commands, and the debug callback function may be called from a thread other than that in which the commands are executed.
+        // See glDebugMessageCallback.
+        DebugOutputSynchronous = GL_DEBUG_OUTPUT_SYNCHRONOUS,
+
+        /// @brief If enabled, the -wc<=zc<=wc plane equation is ignored by view volume clipping (effectively, there is no near or far plane clipping).
+        // See glDepthRange.
+        DepthClamp = GL_DEPTH_CLAMP,
+
+        /// @brief If enabled, do depth comparisons and update the depth buffer.
+        /// Note that even if the depth buffer exists and the depth mask is non-zero, the depth buffer is not updated if the depth test is disabled.
+        /// See glDepthFunc and glDepthRange.
+        DepthTest = GL_DEPTH_TEST,
+
+        /// @brief If enabled, dither color components or indices before they are written to the color buffer.
+        Dither = GL_DITHER,
+
+        /// @brief If enabled and the value of GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING for the framebuffer attachment corresponding to the destination buffer is GL_SRGB, the R, G, and B destination color values (after conversion from fixed-point to floating-point) are considered to be encoded for the sRGB color space and hence are linearized prior to their use in blending.
+        FramebufferSRGB = GL_FRAMEBUFFER_SRGB,
+
+        /// @brief If enabled, draw lines with correct filtering. Otherwise, draw aliased lines.
+        /// See glLineWidth.
+        LineSmooth = GL_LINE_SMOOTH,
+
+        /// @brief If enabled, use multiple fragment samples in computing the final color of a pixel.
+        /// See glSampleCoverage.
+        Multisample = GL_MULTISAMPLE,
+
+        /// @brief If enabled, and if the polygon is rendered in GL_FILL mode, an offset is added to depth values of a polygon's fragments before the depth comparison is performed.
+        /// See glPolygonOffset.
+        PolygonOffsetFill = GL_POLYGON_OFFSET_FILL,
+
+        /// @brief If enabled, and if the polygon is rendered in GL_LINE mode, an offset is added to depth values of a polygon's fragments before the depth comparison is performed.
+        /// See glPolygonOffset.
+        PolygonOffsetLine = GL_POLYGON_OFFSET_LINE,
+        
+        /// @brief If enabled, an offset is added to depth values of a polygon's fragments before the depth comparison is performed, if the polygon is rendered in GL_POINT mode.
+        /// See glPolygonOffset.
+        PolygonOffsetPoint = GL_POLYGON_OFFSET_POINT,
+
+        /// @brief If enabled, draw polygons with proper filtering.
+        /// Otherwise, draw aliased polygons.
+        /// For correct antialiased polygons, an alpha buffer is needed and the polygons must be sorted front to back.
+        PolygonSmooth = GL_POLYGON_SMOOTH,
+
+        /// @brief Enables primitive restarting.
+        /// If enabled, any one of the draw commands which transfers a set of generic attribute array elements to the GL will restart the primitive when the index of the vertex is equal to the primitive restart index.
+        /// See glPrimitiveRestartIndex.
+        PrimitiveRestart = GL_PRIMITIVE_RESTART,
+
+        /// @brief Enables primitive restarting with a fixed index.
+        /// If enabled, any one of the draw commands which transfers a set of generic attribute array elements to the GL will restart the primitive when the index of the vertex is equal to the fixed primitive index for the specified index type.
+        /// The fixed index is equal to 2n-1 where n is equal to 8 for GL_UNSIGNED_BYTE, 16 for GL_UNSIGNED_SHORT and 32 for GL_UNSIGNED_INT.
+        PrimitiveRestartFixedIndex = GL_PRIMITIVE_RESTART_FIXED_INDEX,
+
+        /// @brief If enabled, primitives are discarded after the optional transform feedback stage, but before rasterization.
+        // Furthermore, when enabled, glClear, glClearBufferData, glClearBufferSubData, glClearTexImage, and glClearTexSubImage are ignored.
+        RasterizerDiscard = GL_RASTERIZER_DISCARD,
+
+        /// @brief If enabled, compute a temporary coverage value where each bit is determined by the alpha value at the corresponding sample location.
+        /// The temporary coverage value is then ANDed with the fragment coverage value.
+        SampleAlphaToCoverage = GL_SAMPLE_ALPHA_TO_COVERAGE,
+
+        /// @brief If enabled, each sample alpha value is replaced by the maximum representable alpha value.
+        SampleAlphaToOne = GL_SAMPLE_ALPHA_TO_ONE,
+
+        /// @brief If enabled, the fragment's coverage is ANDed with the temporary coverage value.
+        /// If GL_SAMPLE_COVERAGE_INVERT is set to GL_TRUE, invert the coverage value.
+        /// See glSampleCoverage.
+        SampleCoverage = GL_SAMPLE_COVERAGE,
+
+        /// @brief If enabled, the active fragment shader is run once for each covered sample, or at fraction of this rate as determined by the current value of GL_MIN_SAMPLE_SHADING_VALUE.
+        /// See glMinSampleShading.
+        SampleShading = GL_SAMPLE_SHADING,
+
+        /// @brief If enabled, the sample coverage mask generated for a fragment during rasterization will be ANDed with the value of GL_SAMPLE_MASK_VALUE before shading occurs.
+        /// See glSampleMaski.
+        SampleMask = GL_SAMPLE_MASK,
+
+        /// @brief If enabled, discard fragments that are outside the scissor rectangle.
+        /// See glScissor.
+        ScissorTest = GL_SCISSOR_TEST,
+
+        /// @brief If enabled, do stencil testing and update the stencil buffer.
+        /// See glStencilFunc and glStencilOp.
+        StencilMask = GL_STENCIL_TEST,
+
+        /// @brief If enabled, cubemap textures are sampled such that when linearly sampling from the border between two adjacent faces, texels from both faces are used to generate the final sample value.
+        /// When disabled, texels from only a single face are used to construct the final sample value.
+        TextureCubeMapSeamless = GL_TEXTURE_CUBE_MAP_SEAMLESS,
+
+        /// @brief If enabled and a vertex or geometry shader is active, then the derived point size is taken from the (potentially clipped) shader builtin gl_PointSize and clamped to the implementation-dependent point size range.
+        ProgramPointSize = GL_PROGRAM_POINT_SIZE,
+    };
+
 	namespace GL
 	{
         /// <summary>
@@ -737,6 +902,58 @@ namespace Nova
         inline void Clear(ClearMask mask) noexcept
         {
             glClear((GLenum)mask);
+        }
+
+        /// @brief Bind a buffer object to an indexed buffer target.
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindBufferBase.xhtml
+        /// @param target Specify the target of the bind operation.
+        /// @param index Specify the index of the binding point within the array specified by target.
+        /// @param buffer The name of a buffer object to bind to the specified binding point.
+        inline void BindBufferBase(BufferBaseTarget target, GLuint index, GLuint buffer) noexcept
+        {
+            glBindBufferBase((GLenum)target, index, buffer);
+        }
+
+        /// @brief Bind a range within a buffer object to an indexed buffer target.
+        /// 
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindBufferRange.xhtml
+        /// @param target Specify the target of the bind operation.
+        /// @param index Specify the index of the binding point within the array specified by target.
+        /// @param buffer The name of a buffer object to bind to the specified binding point.
+        /// @param offset The starting offset in basic machine units into the buffer object.
+        /// @param size The amount of data in machine units that can be read from the buffer object while used as an indexed target.
+        inline void BindBufferRange(BufferBaseTarget target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size) noexcept
+        {
+            glBindBufferRange((GLenum)target, index, buffer, offset, size);
+        }
+
+        /// @brief Bind a named buffer object.
+        /// 
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindBuffer.xhtml
+        /// @param target Specifies the target to which the buffer object is bound.
+        /// @param buffer Specifies the name of a buffer object.
+        inline void BindBuffer(BufferBindTarget target, GLuint buffer) noexcept
+        {
+            glBindBuffer((GLenum)target, buffer);
+        }
+
+        /// @brief Enable server-side GL capabilities.
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glEnable.xhtml
+        /// @param cap Specifies a symbolic constant indicating a GL capability.
+        inline void Enable(EnableCap cap) noexcept
+        {
+            glEnable((GLenum)cap);
+        }
+
+        /// @brief Disable server-side GL capabilities.
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glEnable.xhtml
+        /// @param cap Specifies a symbolic constant indicating a GL capability.
+        inline void Disable(EnableCap cap) noexcept
+        {
+            glDisable((GLenum)cap);
         }
 	}
 
