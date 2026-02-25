@@ -284,6 +284,15 @@ void Window::Iconfiy()
 	glfwIconifyWindow(s_WindowHandle);
 }
 
+void Window::SetCursorCapture(bool isCaptured) noexcept
+{
+	NV_PROFILE_FUNC;
+	glfwSetInputMode(
+		s_WindowHandle,
+		GLFW_CURSOR,
+		isCaptured ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+}
+
 std::pair<int, int> Window::GetSize() noexcept
 {
 	int width, height;

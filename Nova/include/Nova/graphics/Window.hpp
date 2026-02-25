@@ -95,6 +95,8 @@ namespace Nova
 
         NV_API bool ShouldClose() noexcept;
 
+        NV_API void SetCursorCapture(bool isCaptured) noexcept;
+
         NV_API GLFWwindow *GetNativeHandle() noexcept;
 
         /// <summary>
