@@ -13,16 +13,18 @@
 
 namespace Nova
 {
-	struct LightSource
-	{
-		glm::vec4 Color;
-		glm::vec3 Position;
-	};
-
 	struct Material
 	{
 		size_t ID;
 		glm::vec4 Color;
+	};
+
+	struct RendererInfo
+	{
+		std::string_view VendorName;
+		std::string_view RendererName;
+		std::string_view Version;
+		std::string_view GLSLVersion;
 	};
 
 	enum class PolygonMode
@@ -63,6 +65,8 @@ namespace Nova
 
 		NV_API GLuint GetRenderTextureID(RenderTexture texture) noexcept;
 
+		NV_API const RendererInfo& GetInfo() noexcept;
+
 		/*NV_API void BeginFrame(int displayWidth, int displayHeight);
 
 		NV_API void BeginFrame(glm::ivec2 displaySize);
@@ -87,7 +91,9 @@ namespace Nova
 
 		NV_API void RenderInstance(const glm::mat4 &transform, const glm::vec4 &color, const Texture &texture, uint32_t entityID);*/
 
-		NV_API void AddLightSource(const LightSource &lightSource);
+		NV_API void AddPointLight(const glm::vec4& color, const glm::vec3& position, float radius);
+
+		NV_API void AddDirectionalLight(const glm::vec4& color, const glm::vec3& direction);
 
 		NV_API void Clear(ClearMask mask = ClearMask::ColorBufferBit) noexcept;
 

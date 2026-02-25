@@ -16,6 +16,28 @@
 
 using namespace Nova;
 
+constexpr GLuint c_MaxPointLights = 32;
+constexpr GLuint c_MaxDirLights = 2;
+
+struct PointLightData
+{
+	glm::vec4 Color;
+	glm::vec3 Position;
+	float Radius;
+};
+
+struct DirLightData
+{
+	glm::vec4 Color;
+	glm::vec3 Direction;
+};
+
+struct LightingData
+{
+	PointLightData PointLightsData[c_MaxPointLights];
+	DirLightData DirLightsData[c_MaxDirLights];
+};
+
 struct DrawCommand
 {
 	GLuint Count;
@@ -55,7 +77,6 @@ typedef size_t ModelID;
 typedef size_t MaterialID;
 
 constexpr GLuint c_ModelDataBufferBinding = 0;
-constexpr GLuint c_MaxLightSources = 32;
 constexpr GLsizei c_ShadowMapWidth = 1024;
 constexpr GLsizei c_ShadowMapHeight = 1024;
 constexpr GLsizei c_MaxShadowCasters = 8;
@@ -63,13 +84,10 @@ constexpr GLsizei c_MaxShadowCasters = 8;
 static std::unordered_map<const Model*, DrawData> s_DrawData;
 static std::unordered_map<MaterialID, GLuint> s_Materials;
 
-static GLuint s_LastLightSource = 0;
-static std::array<LightSource, c_MaxLightSources> s_Lights;
-
 static PersistentMappedBuffer s_InstanceBuffer;
 static PersistentMappedBuffer s_CameraDataBuffer;
+static PersistentMappedBuffer s_LightsBuffer;
 static Buffer s_MaterialsBuffer;
-static Buffer s_LightsBuffer;
 static ShaderProgram s_ShaderProgram;
 static ShaderProgram s_DeferredGeometryProgram;
 static ShaderProgram s_DeferredLightProgram;
@@ -78,6 +96,10 @@ static Texture s_WhiteTexture;
 static Framebuffer s_Framebuffer;
 static Sync s_FrameSync;
 static Sync s_InstanceDataSync;
+static RendererInfo s_RendererInfo;
+static LightingData* s_LightingData;
+static GLuint s_PointLightsCount;
+static GLuint s_DirLightsCount;
 
 static void CacheMaterial(const Material& material)
 {
@@ -150,6 +172,14 @@ static ShaderProgram CreateDeferredLightingShaderProgram()
 	});
 }
 
+static void RetrieveRendererInfo() noexcept
+{
+	s_RendererInfo.VendorName = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+	s_RendererInfo.RendererName = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+	s_RendererInfo.Version = reinterpret_cast<const char*>(glGetString(GL_VERSION));
+	s_RendererInfo.GLSLVersion = reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION));
+}
+
 void Renderer::Render(
 	const Model* model,
 	const Material& material,
@@ -194,6 +224,11 @@ void Renderer::SetCamera(
 	s_CameraDataBuffer.Commit();
 }
 
+const RendererInfo& Renderer::GetInfo() noexcept
+{
+	return s_RendererInfo;
+}
+
 void Renderer::SetViewport(const Rect<int>& viewport) noexcept
 {
     NV_PROFILE_FUNC;
@@ -211,15 +246,33 @@ void Renderer::SetViewport(
 	glScissor(scissor.X, scissor.Y, scissor.Width, scissor.Height);
 }
 
-void Renderer::AddLightSource(const LightSource &lightSource)
+void Renderer::AddPointLight(const glm::vec4& color, const glm::vec3& position, float radius)
 {
-    NV_PROFILE_FUNC;
-	
-	if (s_LastLightSource >= c_MaxLightSources)
+	NV_PROFILE_FUNC;
+
+	if (s_PointLightsCount >= c_MaxPointLights)
 		return;
-	
-	s_Lights[s_LastLightSource] = lightSource;
-	s_LastLightSource++;
+
+	auto& data = s_LightingData->PointLightsData[s_PointLightsCount];
+	data.Color = color;
+	data.Position = position;
+	data.Radius = radius;
+
+	s_PointLightsCount++;
+}
+
+void Renderer::AddDirectionalLight(const glm::vec4& color, const glm::vec3& direction)
+{
+	NV_PROFILE_FUNC;
+
+	if (s_DirLightsCount >= c_MaxDirLights)
+		return;
+
+	auto& data = s_LightingData->DirLightsData[s_DirLightsCount];
+	data.Color = color;
+	data.Direction = direction;
+
+	s_DirLightsCount++;
 }
 
 void Renderer::SetClearColor(float r, float g, float b, float a) noexcept
@@ -318,21 +371,29 @@ void Renderer::Draw(const glm::vec4& clearColor)
 		DrawBatch(model, drawData);
 
 	s_DeferredLightProgram.SetUniform("uAmbient", 0.3f);
-	s_DeferredLightProgram.SetUniform("uLightsCount", s_LastLightSource);
+	s_DeferredLightProgram.SetUniform("uPointLightsCount", s_PointLightsCount);
+	s_DeferredLightProgram.SetUniform("uDirLightsCount", s_DirLightsCount);
 	s_DeferredLightProgram.Use();
 
+	s_FrameSync.WaitClient();
+
 	s_LightsBuffer.Bind(
-		BindingTarget::ShaderStorageBuffer,
-		s_DeferredLightProgram.GetResourceLocation("sLightData"));
-	s_LightsBuffer.Reset();
-	s_LightsBuffer.Store(s_Lights.data(), sizeof(LightSource) * s_LastLightSource);
+		BufferBaseTarget::ShaderStorageBuffer,
+		s_DeferredLightProgram.GetResourceLocation("sPointLightsBuffer"),
+		offsetof(LightingData, PointLightsData),
+		sizeof(PointLightData) * c_MaxPointLights);
+
+	s_LightsBuffer.Commit(
+		offsetof(LightingData, PointLightsData),
+		sizeof(PointLightData) * s_PointLightsCount);
+	s_LightsBuffer.Commit(
+		offsetof(LightingData, DirLightsData),
+		sizeof(DirLightData) * s_DirLightsCount);
 
 	s_CameraDataBuffer.Bind(
 		BufferBaseTarget::UniformBuffer,
 		s_DeferredLightProgram.GetResourceLocation("uCameraData"));
 	
-	s_LastLightSource = 0;
-
 	const std::array<GLuint, 3> gBufferTextureIDs {
 		s_Framebuffer.GetAttachment(0).AttachmentID,
 		s_Framebuffer.GetAttachment(1).AttachmentID,
@@ -341,10 +402,16 @@ void Renderer::Draw(const glm::vec4& clearColor)
 
 	Texture::BindTextures(gBufferTextureIDs);
 	
+	GL::Disable(EnableCap::DepthTest);
+	glDepthMask(GL_FALSE);
+
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	s_FrameSync.Set();
 	s_Framebuffer.Unbind();
+
+	s_PointLightsCount = 0;
+	s_DirLightsCount = 0;
 }
 
 GLuint Renderer::GetRenderTextureID(RenderTexture texture) noexcept
@@ -362,6 +429,8 @@ void Renderer::_Initialize(
 
 	if (!gladLoadGL(getProcAddressFunc))
 		throw std::runtime_error("Failed to load OpenGL bindings.");
+
+	RetrieveRendererInfo();
 
 	GL::Disable(EnableCap::Multisample);
 	GL::Enable(EnableCap::ScissorTest);
@@ -404,8 +473,9 @@ void Renderer::_Initialize(
 	s_MaterialsBuffer = Buffer(sizeof(glm::vec4) * 32, true);
 	s_MaterialsBuffer.SetDebugName("MaterialsBuffer");
 
-	s_LightsBuffer = Buffer(sizeof(LightSource) * c_MaxLightSources, true);
+	s_LightsBuffer = PersistentMappedBuffer(sizeof(LightingData), BufferAccessFlags::Writable);
 	s_LightsBuffer.SetDebugName("LightsBuffer");
+	s_LightingData = static_cast<LightingData*>(s_LightsBuffer.GetBasePtr());
 
 	s_VertexArray = VertexArray({
 		VertexInput {
