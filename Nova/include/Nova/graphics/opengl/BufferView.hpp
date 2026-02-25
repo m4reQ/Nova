@@ -2,6 +2,7 @@
 #include <glad/gl.h>
 #include <type_traits>
 #include <utility>
+#include <span>
 
 namespace Nova
 {
