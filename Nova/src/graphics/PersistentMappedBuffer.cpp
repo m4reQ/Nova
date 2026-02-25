@@ -1,18 +1,24 @@
 #include <Nova/graphics/opengl/PersistentMappedBuffer.hpp>
 #include <Nova/graphics/opengl/GL.hpp>
+#include <Nova/debug/Profile.hpp>
 
 using namespace Nova;
 
 PersistentMappedBuffer::PersistentMappedBuffer(const PersistentMappedBuffer& other)
-    : id_(GL::CreateBuffer())
 {
+    NV_PROFILE_FUNC;
+
+    id_ = GL::CreateBuffer();
     GL::CopyNamedBufferSubData(other.id_, id_, 0, 0, other.GetSize());
 }
 
 PersistentMappedBuffer::PersistentMappedBuffer(GLsizeiptr size, BufferAccessFlags accessFlags, const void *data)
-    : id_(GL::CreateBuffer()),
-      size_(size)
+    : size_(size)
 {
+    NV_PROFILE_FUNC;
+
+    id_ = GL::CreateBuffer();
+
     const auto storageFlags = (BufferStorageFlags)accessFlags
         | BufferStorageFlags::MapPersistentBit;
     GL::NamedBufferStorage(id_, size, data, storageFlags);
@@ -32,8 +38,14 @@ PersistentMappedBuffer::~PersistentMappedBuffer() noexcept
 
 GLsizeiptr PersistentMappedBuffer::Commit() noexcept
 {
-    glFlushMappedNamedBufferRange(id_, 0, GetDataSize());
+    NV_PROFILE_FUNC;
+
+    const auto flushedDataSize = GetDataSize();
+    
+    glFlushMappedNamedBufferRange(id_, 0, flushedDataSize);
     dataCurrent_ = dataBase_;
+
+    return flushedDataSize;
 }
 
 void PersistentMappedBuffer::Discard() noexcept
@@ -48,6 +60,34 @@ void PersistentMappedBuffer::Write(std::span<const uint8_t> data) noexcept
 
 void PersistentMappedBuffer::Write(const void* data, GLsizeiptr dataSize) noexcept
 {
+    NV_PROFILE_FUNC;
+    
     std::memcpy(dataCurrent_, data, dataSize);
     dataCurrent_ = (uint8_t*)dataCurrent_ + dataSize;
+}
+
+void PersistentMappedBuffer::Bind(BufferBindTarget target) const noexcept
+{
+    NV_PROFILE_FUNC;
+    
+    GL::BindBuffer(target, id_);
+}
+
+void PersistentMappedBuffer::Bind(BufferBaseTarget target, GLuint index) const noexcept
+{
+    NV_PROFILE_FUNC;
+    
+    GL::BindBufferBase(target, index, id_);
+}
+
+void PersistentMappedBuffer::Bind(BufferBaseTarget target, GLuint index, GLintptr offset, GLsizeiptr size) const noexcept
+{
+    NV_PROFILE_FUNC;
+    
+    GL::BindBufferRange(target, index, id_, offset, size);
+}
+
+void PersistentMappedBuffer::SetDebugName(const std::string_view debugName) const noexcept
+{
+    glObjectLabel(GL_BUFFER, id_, debugName.size(), debugName.data());
 }
