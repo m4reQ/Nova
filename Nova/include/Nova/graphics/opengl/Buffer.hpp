@@ -40,20 +40,6 @@ namespace Nova
 		ReadWrite = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT,
 	};
 
-	enum BufferMapFlags
-	{
-		MapNone = 0,
-		MapRead = GL_MAP_READ_BIT,
-		MapWrite = GL_MAP_WRITE_BIT,
-		MapReadWrite = Read | Write,
-		MapPersistent = GL_MAP_PERSISTENT_BIT,
-		MapCoherent = GL_MAP_COHERENT_BIT,
-		MapInvalidateRange = GL_MAP_INVALIDATE_RANGE_BIT,
-		MapInvalidateBuffer = GL_MAP_INVALIDATE_BUFFER_BIT,
-		MapFlushExplicit = GL_MAP_FLUSH_EXPLICIT_BIT,
-		MapUnsynchronized = GL_MAP_UNSYNCHRONIZED_BIT,
-	};
-
 	class Buffer : public GLObject<GL_BUFFER, BufferID>
 	{
 	public:
