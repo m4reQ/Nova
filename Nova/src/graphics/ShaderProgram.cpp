@@ -342,21 +342,24 @@ std::optional<GLuint> ShaderProgram::TryGetResourceLocation(const std::string_vi
 
 void ShaderProgram::SetUniform(const std::string_view name, float value) const
 {
+	NV_PROFILE_FUNC;
 	glProgramUniform1f(id_, GetResourceLocation(name), value);
 }
 
 void ShaderProgram::SetUniform(const std::string_view name, int32_t value) const
 {
+	NV_PROFILE_FUNC;
 	glProgramUniform1i(id_, GetResourceLocation(name), value);
 }
 
 void ShaderProgram::SetUniform(const std::string_view name, uint32_t value) const
 {
+	NV_PROFILE_FUNC;
 	glProgramUniform1ui(id_, GetResourceLocation(name), value);
 }
 
 void ShaderProgram::SetUniform(const std::string_view name, const glm::vec3& value) const
 {
+	NV_PROFILE_FUNC;
 	glProgramUniform3f(id_, GetResourceLocation(name), value.x, value.y, value.z);
-
 }
