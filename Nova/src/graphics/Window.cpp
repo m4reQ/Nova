@@ -424,6 +424,9 @@ void Window::Initialize_(const WindowSettings &settings)
 		break;
 	}
 
+	if (IS_FLAG_SET(settings.Flags, WindowFlags::StartMaximized))
+		glfwMaximizeWindow(s_WindowHandle);
+
 	if (s_WindowHandle == nullptr)
 		throw std::runtime_error("Failed to create GLFW window.");
 

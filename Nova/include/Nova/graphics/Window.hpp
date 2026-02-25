@@ -25,6 +25,7 @@ namespace Nova
         Transparent = 4,
         Vsync = 8,
         CaptureCursor = 16,
+        StartMaximized = 32,
     };
 
     struct WindowSettings
