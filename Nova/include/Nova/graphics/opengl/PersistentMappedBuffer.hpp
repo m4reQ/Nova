@@ -36,22 +36,12 @@ namespace Nova
 
         void Discard() noexcept;
 
-        void Write(std::span<const uint8_t> data) noexcept;
-
         void Write(const void* data, GLsizeiptr dataSize) noexcept;
 
         template <typename T>
-        void Write(const T& value) noexcept
+        void Write(const std::span<T> data) noexcept
         {
-            if constexpr (std::is_trivially_copyable_v<T>)
-            {
-                *static_cast<T*>(dataCurrent_) = value;
-                dataCurrent_ = static_cast<uint8_t*>(dataCurrent_) + sizeof(T);
-            }
-            else
-            {
-                Write(&value, sizeof(T));
-            }
+            Write(data.data(), data.size_bytes());
         }
 
         void Bind(BufferBindTarget target) const noexcept;

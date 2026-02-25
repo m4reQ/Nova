@@ -66,7 +66,7 @@ static std::unordered_map<MaterialID, GLuint> s_Materials;
 static GLuint s_LastLightSource = 0;
 static std::array<LightSource, c_MaxLightSources> s_Lights;
 
-static Buffer s_InstanceBuffer;
+static PersistentMappedBuffer s_InstanceBuffer;
 static PersistentMappedBuffer s_CameraDataBuffer;
 static Buffer s_MaterialsBuffer;
 static Buffer s_LightsBuffer;
@@ -77,6 +77,7 @@ static VertexArray s_VertexArray;
 static Texture s_WhiteTexture;
 static Framebuffer s_Framebuffer;
 static Sync s_FrameSync;
+static Sync s_InstanceDataSync;
 
 static void CacheMaterial(const Material& material)
 {
@@ -187,9 +188,9 @@ void Renderer::SetCamera(
 	
 	s_FrameSync.WaitClient(SyncTimeoutInfinite);
 
-	s_CameraDataBuffer.Write(view);
-	s_CameraDataBuffer.Write(projection);
-	s_CameraDataBuffer.Write(position);
+	s_CameraDataBuffer.Write(glm::value_ptr(view), sizeof(glm::mat4));
+	s_CameraDataBuffer.Write(glm::value_ptr(projection), sizeof(glm::mat4));
+	s_CameraDataBuffer.Write(glm::value_ptr(position), sizeof(glm::vec3));
 	s_CameraDataBuffer.Commit();
 }
 
@@ -243,6 +244,48 @@ void Renderer::SetPolygonMode(PolygonMode mode) noexcept
 	glPolygonMode(GL_FRONT_AND_BACK, (GLenum)mode);
 }
 
+static void DrawBatch(const Model* model, DrawData& data) noexcept
+{
+	NV_PROFILE_FUNC;
+
+	if (data.InstanceData.empty())
+	{
+		data.Age++;
+		return;
+	}
+
+	s_VertexArray.BindVertexBuffer(
+		model->GetModelDataBuffer(),
+		c_ModelDataBufferBinding,
+		sizeof(ModelVertex));
+
+	if (model->UsesIndexBuffer())
+		s_VertexArray.BindElementBuffer(model->GetIndexBuffer().value());
+
+	s_InstanceDataSync.WaitClient(SyncTimeoutInfinite);
+	s_InstanceBuffer.Write(std::span(data.InstanceData));
+	s_InstanceBuffer.Commit();
+
+	if (model->UsesIndexBuffer())
+		glDrawElementsInstanced(
+			model->GetPrimitiveMode(),
+			model->GetIndexDataSize() / sizeof(GLuint),
+			GL_UNSIGNED_INT,
+			nullptr,
+			data.InstanceData.size());
+	else
+		glDrawArraysInstanced(
+			model->GetPrimitiveMode(),
+			0,
+			model->GetModelDataSize() / sizeof(ModelVertex),
+			data.InstanceData.size());
+	
+	s_InstanceDataSync.Set();
+
+	data.Age = 0;
+	data.InstanceData.clear();
+}
+
 void Renderer::Draw(const glm::vec4& clearColor)
 {
 	NV_PROFILE_FUNC;
@@ -272,42 +315,7 @@ void Renderer::Draw(const glm::vec4& clearColor)
 	s_DeferredGeometryProgram.Use();
 
 	for (auto& [model, drawData] : s_DrawData)
-	{
-		NV_PROFILE_SCOPE("::DrawBatch");
-
-		if (drawData.InstanceData.size() == 0)
-		{
-			drawData.Age++;
-			continue;
-		}
-
-		s_VertexArray.BindVertexBuffer(
-			model->GetModelDataBuffer(),
-			c_ModelDataBufferBinding,
-			sizeof(ModelVertex));
-		if (model->UsesIndexBuffer())
-			s_VertexArray.BindElementBuffer(model->GetIndexBuffer().value());
-
-		s_InstanceBuffer.Reset();
-		s_InstanceBuffer.Store(std::span(drawData.InstanceData));
-
-		if (model->UsesIndexBuffer())
-			glDrawElementsInstanced(
-				model->GetPrimitiveMode(),
-				model->GetIndexDataSize() / sizeof(GLuint),
-				GL_UNSIGNED_INT,
-				nullptr,
-				drawData.InstanceData.size());
-		else
-			glDrawArraysInstanced(
-				model->GetPrimitiveMode(),
-				0,
-				model->GetModelDataSize() / sizeof(ModelVertex),
-				drawData.InstanceData.size());
-
-		drawData.Age = 0;
-		drawData.InstanceData.clear();
-	}
+		DrawBatch(model, drawData);
 
 	s_DeferredLightProgram.SetUniform("uAmbient", 0.3f);
 	s_DeferredLightProgram.SetUniform("uLightsCount", s_LastLightSource);
@@ -383,10 +391,14 @@ void Renderer::_Initialize(
 	s_DeferredGeometryProgram = CreateDeferredGeometryShaderProgram();
 	s_DeferredLightProgram = CreateDeferredLightingShaderProgram();
 
-	s_InstanceBuffer = Buffer(sizeof(InstanceData) * 2048, true);
+	s_InstanceBuffer = PersistentMappedBuffer(
+		sizeof(InstanceData) * 512,
+		BufferAccessFlags::Writable);
 	s_InstanceBuffer.SetDebugName("InstanceBuffer");
 	
-	s_CameraDataBuffer = PersistentMappedBuffer(sizeof(CameraData), BufferAccessFlags::Writable);
+	s_CameraDataBuffer = PersistentMappedBuffer(
+		sizeof(CameraData),
+		BufferAccessFlags::Writable);
 	s_CameraDataBuffer.SetDebugName("CameraBuffer");
 	
 	s_MaterialsBuffer = Buffer(sizeof(glm::vec4) * 32, true);
@@ -437,7 +449,7 @@ void Renderer::_Initialize(
 					.Rows = 3,
 				},
 			},
-			.BufferID = s_InstanceBuffer.GetID(),
+			.BufferID = (BufferID)s_InstanceBuffer.GetID(),
 			.InstanceDivisor = 1,
 		},
 	});

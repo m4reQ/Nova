@@ -53,11 +53,6 @@ void PersistentMappedBuffer::Discard() noexcept
     dataCurrent_ = dataBase_;
 }
 
-void PersistentMappedBuffer::Write(std::span<const uint8_t> data) noexcept
-{
-    Write(data.data(), (GLsizeiptr)data.size_bytes());
-}
-
 void PersistentMappedBuffer::Write(const void* data, GLsizeiptr dataSize) noexcept
 {
     NV_PROFILE_FUNC;
