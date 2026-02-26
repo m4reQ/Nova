@@ -86,6 +86,11 @@ void main()
             vec3 v = viewDir;
             vec3 h = normalize(l + v);
 
+            // Smooth radius attenuation
+            float x = dist / light.radius;
+            float attenuation = max(1.0 - x * x, 0.0);
+            attenuation *= attenuation;
+
             // diffuse
             float nDotL = max(dot(normal, l), 0.0);
             vec3 diffuse = nDotL * albedoSpecular.rgb * light.color.rgb * light.color.a;
@@ -97,7 +102,7 @@ void main()
                 light.color.rgb *
                 light.color.a;
             
-            lighting += diffuse + specular;
+            lighting += (diffuse + specular) * attenuation;
         }
     }
 
