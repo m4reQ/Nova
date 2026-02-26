@@ -62,6 +62,8 @@ namespace Nova
 
 		NV_API const RendererInfo& GetInfo() noexcept;
 
+		NV_API void SetDisplaySize(int width, int height) noexcept;
+
 		/*NV_API void BeginFrame(int displayWidth, int displayHeight);
 
 		NV_API void BeginFrame(glm::ivec2 displaySize);

@@ -100,6 +100,8 @@ static RendererInfo s_RendererInfo;
 static LightingData* s_LightingData;
 static GLuint s_PointLightsCount;
 static GLuint s_DirLightsCount;
+static GLsizei s_CurrentDisplayWidth;
+static GLsizei s_CurrentDisplayHeight;
 
 static void CacheMaterial(const Material& material)
 {
@@ -342,6 +344,8 @@ static void DrawBatch(const Model* model, DrawData& data) noexcept
 void Renderer::Draw(const glm::vec4& clearColor)
 {
 	NV_PROFILE_FUNC;
+
+	s_Framebuffer.Resize(s_CurrentDisplayWidth, s_CurrentDisplayHeight);
 	
 	GL::Disable(EnableCap::Blend);
 	GL::Enable(EnableCap::DepthTest);
@@ -432,6 +436,9 @@ void Renderer::_Initialize(
 	GLADloadfunc getProcAddressFunc)
 {
 	NV_PROFILE_FUNC;
+
+	s_CurrentDisplayWidth = frameWidth;
+	s_CurrentDisplayHeight = frameHeight;
 
 	if (!gladLoadGL(getProcAddressFunc))
 		throw std::runtime_error("Failed to load OpenGL bindings.");
@@ -567,6 +574,12 @@ void Renderer::_Initialize(
 void Renderer::DisplayFramebuffer() noexcept
 {
 	s_Framebuffer.Blit(Attachment::Color0);
+}
+
+void Renderer::SetDisplaySize(int width, int height) noexcept
+{
+	s_CurrentDisplayWidth = width;
+	s_CurrentDisplayHeight = height;
 }
 
 void Renderer::_Initialize(
