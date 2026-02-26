@@ -371,21 +371,27 @@ void Renderer::Draw(const glm::vec4& clearColor)
 		DrawBatch(model, drawData);
 
 	s_DeferredLightProgram.SetUniform("uAmbient", 0.3f);
+	s_DeferredLightProgram.SetUniform("uShininess", 86.0f);
 	s_DeferredLightProgram.SetUniform("uPointLightsCount", s_PointLightsCount);
 	s_DeferredLightProgram.SetUniform("uDirLightsCount", s_DirLightsCount);
 	s_DeferredLightProgram.Use();
 
 	s_FrameSync.WaitClient();
-
+	
 	s_LightsBuffer.Bind(
 		BufferBaseTarget::ShaderStorageBuffer,
 		s_DeferredLightProgram.GetResourceLocation("sPointLightsBuffer"),
 		offsetof(LightingData, PointLightsData),
 		sizeof(PointLightData) * c_MaxPointLights);
-
 	s_LightsBuffer.Commit(
 		offsetof(LightingData, PointLightsData),
 		sizeof(PointLightData) * s_PointLightsCount);
+
+	s_LightsBuffer.Bind(
+		BufferBaseTarget::ShaderStorageBuffer,
+		s_DeferredLightProgram.GetResourceLocation("sDirLightsBuffer"),
+		offsetof(LightingData, DirLightsData),
+		sizeof(DirLightData) * c_MaxDirLights);
 	s_LightsBuffer.Commit(
 		offsetof(LightingData, DirLightsData),
 		sizeof(DirLightData) * s_DirLightsCount);
@@ -400,7 +406,7 @@ void Renderer::Draw(const glm::vec4& clearColor)
 		s_Framebuffer.GetAttachment(2).AttachmentID,
 	};
 
-	Texture::BindTextures(gBufferTextureIDs);
+	glBindTextures(0, gBufferTextureIDs.size(), gBufferTextureIDs.data());
 	
 	GL::Disable(EnableCap::DepthTest);
 	glDepthMask(GL_FALSE);
