@@ -21,8 +21,6 @@ private:
 
 	entt::registry entities_;
 	Nova::Model model_;
-	Camera camera_;
 	bool cursorCaptured_ = false;
-	float yaw_ = -90.0f;
-	float pitch_ = 0.0f;
+	entt::entity mainCameraEntity_ = (entt::entity)-1;
 };

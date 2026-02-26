@@ -3,8 +3,13 @@
 #include <Nova/graphics/Renderer.hpp>
 #include <Nova/input/Input.hpp>
 #include <Nova/core/Application.hpp>
-#include "components/NameComponent.hpp"
-#include "components/TransformComponent.hpp"
+#include <Nova/ecs/components/NameComponent.hpp>
+#include <Nova/ecs/components/TransformComponent.hpp>
+#include <Nova/ecs/components/LightComponent.hpp>
+#include <Nova/ecs/components/TransformComponent.hpp>
+#include <Nova/ecs/components/CameraComponent.hpp>
+#include <Nova/ecs/components/RenderComponent.hpp>
+#include <Nova/ecs/components/ScriptComponent.hpp>
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
@@ -14,6 +19,9 @@
 #include <random>
 #include <limits>
 #include <iostream>
+#include "CameraController.hpp"
+
+constexpr entt::entity InvalidEntity = (entt::entity)-1;
 
 struct HeartData
 {
@@ -47,6 +55,19 @@ template <typename T>
 static T& SelectRandomElement(std::span<T> container) noexcept
 {
     return container[Random(0zu, container.size() - 1)];
+}
+
+static glm::mat4 BuildTransformMatrix(const glm::vec3& position, const glm::quat& rotation, const glm::vec3 scale) noexcept
+{
+    const auto rotationMatrix = glm::mat3_cast(rotation);
+
+    glm::mat4 result;
+    result[0] = glm::vec4(rotationMatrix[0] * scale.x, 0.0f);
+    result[1] = glm::vec4(rotationMatrix[1] * scale.x, 0.0f);
+    result[2] = glm::vec4(rotationMatrix[2] * scale.x, 0.0f);
+    result[3] = glm::vec4(position, 1.0f);
+
+    return result;
 }
 
 static Nova::Model LoadModelFromObjFile(const std::filesystem::path& filepath)
@@ -146,65 +167,75 @@ static void TryAddEntityComponentTreeNode(const entt::registry& registry, entt::
     const auto component = registry.try_get<TComponent>(entity);
     if (component)
     {
-        const auto name = std::format("{}###{}", componentName, (uint32_t)entity);
+        const auto name = std::format("{}##{}", componentName, (uint32_t)entity);
         ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen);
     }
 }
 
-void MainLayer::OnResizeEvent(const Nova::WindowResizeEvent& event) noexcept
+static void RenderScene(const entt::registry& scene, entt::entity cameraEntity)
 {
-    Nova::Renderer::SetViewport(event.GetRect(), event.GetRect());
-    camera_.SetAspectRatio(event.GetWidth(), event.GetHeight());
-}
+    // set main scene camera
+    auto view = glm::identity<glm::mat4>();
+    auto projection = glm::identity<glm::mat4>();
+    auto cameraPosition = glm::vec3(0.0f);
 
-void MainLayer::OnKeyEvent(const Nova::KeyEvent& event) noexcept
-{
-    if (!event.IsPressed())
-        return;
-
-    if (event.GetKey() == Nova::Key::_1)
-        cursorCaptured_ = !cursorCaptured_;
-}
-
-void MainLayer::OnMouseMoveEvent(const Nova::MouseMoveEvent& event) noexcept
-{
-    constexpr float mouseSensitivity = 0.08f;
-
-    yaw_ += (float)-event.GetDeltaX() * mouseSensitivity;
-    pitch_ += (float)event.GetDeltaY() * mouseSensitivity;
-
-    camera_.SetRotationDegrees(yaw_, pitch_);
-}
-
-void MainLayer::OnMouseScrollEvent(const Nova::MouseScrollEvent& event) noexcept
-{
-    camera_.SetFOVDegrees(
-        std::min(
-            std::max(
-                camera_.GetFOVDegrees() - (float)event.GetVertical(),
-                1.0f),
-            89.0f));
-}
-
-bool MainLayer::OnEvent(const Nova::Event& event)
-{
-    switch (event.GetEventType())
+    const auto camera = scene.try_get<CameraComponent>(cameraEntity);
+    if (camera)
     {
-    case Nova::EventType::WindowResize:
-        OnResizeEvent((const Nova::WindowResizeEvent&)event);
-        break;
-    case Nova::EventType::Key:
-        OnKeyEvent((const Nova::KeyEvent&)event);
-        break;
-    case Nova::EventType::MouseMove:
-        OnMouseMoveEvent((const Nova::MouseMoveEvent&)event);
-        break;
-    case Nova::EventType::MouseScroll:
-        OnMouseScrollEvent((const Nova::MouseScrollEvent&)event);
-        break;
+        view = glm::lookAt(
+            camera->Position,
+            camera->Position + camera->Front,
+            camera->Up);
+        projection = camera->Type == CameraType::Perspective
+            ? glm::perspective(
+                camera->Data.Perspective.FOV,
+                camera->Data.Perspective.AspectRatio,
+                camera->Data.Perspective.ZNear,
+                camera->Data.Perspective.ZFar)
+            : glm::ortho(
+                camera->Data.Ortho.Left,
+                camera->Data.Ortho.Right,
+                camera->Data.Ortho.Bottom,
+                camera->Data.Ortho.Top);
+        cameraPosition = camera->Position;
     }
 
-    return false;
+    Nova::Renderer::SetCamera(view, projection, cameraPosition);
+
+    // set directional lights
+    scene.view<DirectionalLightComponent>().each(
+        [](auto entity, const auto& lightComponent)
+        {
+            Nova::Renderer::AddDirectionalLight(
+                glm::vec4(lightComponent.Color, lightComponent.Intensity),
+                lightComponent.Direction);
+        });
+    
+    // set point lights
+    scene.view<TransformComponent, PointLightComponent>().each(
+        [](auto entity, const auto& transform, const auto& light)
+        {
+            Nova::Renderer::AddPointLight(
+                glm::vec4(light.Color, light.Intensity),
+                transform.Position,
+                light.Radius);
+        });
+
+    // render objects
+    scene.view<TransformComponent, RenderComponent>().each(
+        [](auto entity, const auto& transform, const auto& render)
+        {
+            Nova::Renderer::Render(
+                render.Model,
+                *render.Material,
+                BuildTransformMatrix(
+                    transform.Position,
+                    transform.Rotation,
+                    transform.Scale));
+        });
+
+    // draw
+    // Nova::Renderer::Draw(glm::vec4(0.529f, 0.529f, 0.529f, 1.0f));
 }
 
 MainLayer::MainLayer()
@@ -258,65 +289,114 @@ MainLayer::MainLayer()
             
     model_ = LoadModelFromObjFile("./assets/heart.obj");
 
-    auto first = entities_.create();
-    entities_.emplace<NameComponent>(first, "First");
-    entities_.emplace<TransformComponent>(first);
-    entities_.emplace<NameComponent>(entities_.create(), "Second");
-    entities_.create();
-    entities_.create();
+    // initialize main camera
+    mainCameraEntity_ = entities_.create();
+    entities_.emplace<NameComponent>(mainCameraEntity_, "MainCamera");
+    entities_.emplace<CameraComponent>(
+        mainCameraEntity_,
+        CameraComponent::CreatePerspective(
+            glm::radians(45.0f),
+            Nova::Window::GetAspectRatio(),
+            0.001f,
+            3.0f));
+    auto& scriptComponent = entities_.emplace<CPPScriptComponent>(mainCameraEntity_, CPPScriptComponent::Create<CameraController>());
+    scriptComponent.ControllerInstance->OnAttach(entities_, mainCameraEntity_);
+
+    // initialize lights
+    auto light1 = entities_.create();
+    entities_.emplace<NameComponent>(light1, "Point light 1");
+    entities_.emplace<PointLightComponent>(
+        light1,
+        PointLightComponent {
+            .Color = {1.0f, 0.09f, 0.985f},
+            .Intensity = 0.4f,
+            .Radius = 0.2f,
+        });
+    entities_.emplace<TransformComponent>(
+        light1,
+        TransformComponent {
+            .Position = {0.5f, 0.0f, -1.3f},
+        });
+
+    auto light2 = entities_.create();
+    entities_.emplace<NameComponent>(light2, "Point light 2");
+    entities_.emplace<PointLightComponent>(
+        light2,
+        PointLightComponent {
+            .Color = {1.0f, 0.5f, 0.03f},
+            .Intensity = 0.4f,
+            .Radius = 0.2f,
+        });
+    entities_.emplace<TransformComponent>(
+        light2,
+        TransformComponent {
+            .Position = {0.5f, 0.0f, -1.6f},
+        });
+
+    auto light3 = entities_.create();
+    entities_.emplace<NameComponent>(light3, "Point light 3");
+    entities_.emplace<PointLightComponent>(
+        light3,
+        PointLightComponent {
+            .Color = {1.0f, 0.5f, 0.8f},
+            .Intensity = 0.4f,
+            .Radius = 0.2f,
+        });
+    entities_.emplace<TransformComponent>(
+        light3,
+        TransformComponent {
+            .Position = {-0.2f, 0.0f, -1.3f},
+        });
+
+    auto light4 = entities_.create();
+    entities_.emplace<NameComponent>(light4, "Point light 4");
+    entities_.emplace<PointLightComponent>(
+        light4,
+        PointLightComponent {
+            .Color = {1.0f, 1.0f, 1.0f},
+            .Intensity = 0.5f,
+            .Radius = 0.6f,
+        });
+    entities_.emplace<TransformComponent>(
+        light4,
+        TransformComponent {
+            .Position = {0.0f, 1.5f, 0.0f},
+        });
+
+    auto dirLight = entities_.create();
+    entities_.emplace<NameComponent>(dirLight, "Sunlight");
+    entities_.emplace<DirectionalLightComponent>(
+        dirLight,
+        DirectionalLightComponent {
+            .Color = {1.0f, 1.0f, 1.0f},
+            .Intensity = 0.2f,
+            .Direction = {0.5f, 0.0f, -1.0f},
+        });
 }
 
 void MainLayer::OnUpdate(double frametime)
 {
-    float cameraSpeed = 0.5f * frametime;
+    entities_.view<CPPScriptComponent>().each(
+        [=](auto entity, auto& script)
+        {
+            script.ControllerInstance->OnUpdate(frametime);
+        });
+}
 
-    glm::vec3 cameraDelta = glm::zero<glm::vec3>();
-    if (Nova::Input::IsKeyDown(Nova::Key::W))
-        cameraDelta += camera_.GetFront();
-    if (Nova::Input::IsKeyDown(Nova::Key::S))
-        cameraDelta -= camera_.GetFront();
-    if (Nova::Input::IsKeyDown(Nova::Key::D))
-        cameraDelta += glm::normalize(
-            glm::cross(
-                camera_.GetFront(),
-                camera_.GetUp()));
-    if (Nova::Input::IsKeyDown(Nova::Key::A))
-        cameraDelta -= glm::normalize(
-            glm::cross(
-                camera_.GetFront(),
-                camera_.GetUp()));
-    if (Nova::Input::IsKeyDown(Nova::Key::Space))
-        cameraDelta += camera_.GetUp();
-    if (Nova::Input::IsKeyDown(Nova::Key::LeftShift))
-        cameraDelta -= camera_.GetUp();
+bool MainLayer::OnEvent(const Nova::Event& event)
+{
+    entities_.view<CPPScriptComponent>().each(
+        [&](auto entity, auto& script)
+        {
+            script.ControllerInstance->OnEvent(event);
+        });
     
-    camera_.Move(cameraDelta * cameraSpeed);
+    return false;
 }
 
 void MainLayer::OnRender()
 {
-    // Render main scene
-    Nova::Renderer::SetCamera(
-        camera_.GetViewMatrix(),
-        camera_.GetProjectionMatrix(),
-        camera_.GetPosition());
-    Nova::Renderer::SetPolygonMode(Nova::PolygonMode::Fill);
-
-    Nova::Renderer::AddLightSource(
-        Nova::LightSource{
-            .Color = {1.0f, 0.09f, 0.985f, 0.2f},
-            .Position = {0.5f, 0.0f, -1.3f},
-        });
-    Nova::Renderer::AddLightSource(
-        Nova::LightSource{
-            .Color = {1.0f, 1.0f, 1.0f, 0.3f},
-            .Position = {0.0f, 1.5f, 0.0f},
-        });
-    Nova::Renderer::AddLightSource(
-        Nova::LightSource{
-            .Color = {1.0f, 0.4f, 0.1f, 0.03f},
-            .Position = camera_.GetPosition(),
-        });
+    RenderScene(entities_, mainCameraEntity_);
 
     for (const auto& heart : hearts_)
         Nova::Renderer::Render(&model_, heart.Material, heart.Transform);
@@ -343,6 +423,10 @@ void MainLayer::OnRender()
         if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
         {
             TryAddEntityComponentTreeNode<TransformComponent>(entities_, entity, "Transform");
+            TryAddEntityComponentTreeNode<DirectionalLightComponent>(entities_, entity, "Light (Directional)");
+            TryAddEntityComponentTreeNode<PointLightComponent>(entities_, entity, "Light (Point)");
+            TryAddEntityComponentTreeNode<CameraComponent>(entities_, entity, "Camera");
+            TryAddEntityComponentTreeNode<CPPScriptComponent>(entities_, entity, "Script");
             ImGui::TreePop();
         }
     }
@@ -353,14 +437,38 @@ void MainLayer::OnRender()
     ImGui::Text("Viewport size: %dx%d", 0, 0);
     ImGui::Text("Frametime: %.2lf ms", Nova::Application::GetFrametime() * 1000.0);
     ImGui::Text("FPS: %.2lf", 1.0 / Nova::Application::GetFrametime());
+    ImGui::Separator();
+
+    const auto& rendererInfo = Nova::Renderer::GetInfo();
+    ImGui::Text("Renderer: %s", rendererInfo.RendererName.data());
+    ImGui::SetItemTooltip(rendererInfo.RendererName.data());
+
+    ImGui::Text("Vendor: %s", rendererInfo.VendorName.data());
+    ImGui::SetItemTooltip(rendererInfo.VendorName.data());
+
+    ImGui::Text("Version: %s", rendererInfo.Version.data());
+    ImGui::SetItemTooltip(rendererInfo.Version.data());
+
+    ImGui::Text("GLSL Version: %s", rendererInfo.GLSLVersion.data());
+    ImGui::SetItemTooltip(rendererInfo.GLSLVersion.data());
+
     ImGui::End();
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
     ImGui::PushStyleVar(ImGuiStyleVar_ImageBorderSize, 0.0f);
     ImGui::Begin("Viewport");
+    
+    const auto viewportSize = ImGui::GetContentRegionAvail();
+    
+    Nova::Renderer::SetDisplaySize(viewportSize.x, viewportSize.y);
+    
+    auto camera = entities_.try_get<CameraComponent>(mainCameraEntity_);
+    if (camera && camera->Type == CameraType::Perspective)
+        camera->Data.Perspective.AspectRatio = viewportSize.x / viewportSize.y;
+
     ImGui::Image(
         Nova::Renderer::GetRenderTextureID(Nova::RenderTexture::Output),
-        ImGui::GetContentRegionAvail(),
+        viewportSize,
         {0.0f, 1.0f},
         {1.0f, 0.0f});
     ImGui::End();
@@ -368,6 +476,6 @@ void MainLayer::OnRender()
 
     ImGui::Render();
 
-    Nova::Renderer::Clear(0.0f, 0.0f, 0.0f, 0.0f);
+    Nova::Renderer::Clear();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

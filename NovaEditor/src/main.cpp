@@ -11,10 +11,10 @@ int main()
         Nova::Application::Initialize(
             Nova::ApplicationSettings{
                 .WindowSettings{
-                    .Width = 1080,
-                    .Height = 720,
+                    .Width = 1920,
+                    .Height = 1080,
                     .Title = "Nova Editor",
-                    .Flags = Nova::WindowFlags::Resizable | Nova::WindowFlags::Vsync},
+                    .Flags = Nova::WindowFlags::StartMaximized | Nova::WindowFlags::Vsync},
                 .DotnetSettings{
                     .Version = "10.0",
                     .RuntimeConfigPath = "./assets/Nova.runtimeconfig.json",
