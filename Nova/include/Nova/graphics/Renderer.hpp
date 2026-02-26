@@ -5,6 +5,7 @@
 #include <Nova/graphics/opengl/Texture.hpp>
 #include <Nova/graphics/opengl/GL.hpp>
 #include <Nova/graphics/Rect.hpp>
+#include <Nova/graphics/Material.hpp>
 #include <Nova/assets/Model.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
@@ -13,12 +14,6 @@
 
 namespace Nova
 {
-	struct Material
-	{
-		size_t ID;
-		glm::vec4 Color;
-	};
-
 	struct RendererInfo
 	{
 		std::string_view VendorName;

@@ -1,10 +1,12 @@
 #pragma once
+#include <cstdint>
 #include <glm/vec4.hpp>
 
 namespace Nova
 {
     struct Material
-    {
-        glm::vec4 Color;
-    };
+	{
+		size_t ID;
+		glm::vec4 Color;
+	};
 }
