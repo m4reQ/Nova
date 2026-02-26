@@ -170,8 +170,6 @@ void Framebuffer::Delete() noexcept
 			glDeleteTextures(1, &attachment.AttachmentID);
 	}
 
-	attachments_.clear();
-
 	glDeleteFramebuffers(1, &id_);
 	id_ = 0;
 }
@@ -181,7 +179,7 @@ void Framebuffer::Resize(GLsizei width, GLsizei height) noexcept
 {
 	NV_PROFILE_FUNC;
 
-	Delete();
+	// Delete();
 
 	for (size_t i = 0; i < attachments_.size(); i++)
 	{
@@ -198,6 +196,7 @@ void Framebuffer::Resize(GLsizei width, GLsizei height) noexcept
 
 			if (attachment.Spec.UseRenderbuffer())
 			{
+				glDeleteRenderbuffers(1, &attachment.AttachmentID);
 				glCreateRenderbuffers(1, &attachment.AttachmentID);
 				SetupRenderbufferFromSpec(attachment.AttachmentID, attachment.Spec);
 				glNamedFramebufferRenderbuffer(
@@ -208,13 +207,14 @@ void Framebuffer::Resize(GLsizei width, GLsizei height) noexcept
 			}
 			else
 			{
+				glDeleteTextures(1, &attachment.AttachmentID);
 				glCreateTextures(GL_TEXTURE_2D, 1, &attachment.AttachmentID);
 				SetupTextureFromSpec(attachment.AttachmentID, attachment.Spec);
 				GL::NamedFramebufferTexture(
 					id_,
 					attachmentPoint,
 					attachment.AttachmentID,
-					1);
+					0);
 			}
 		}
 	}
