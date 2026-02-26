@@ -285,7 +285,7 @@ namespace Nova
         Texture3D = GL_TEXTURE_3D,
         TextureCubeMap = GL_TEXTURE_CUBE_MAP,
         TextureCubeMapArray = GL_TEXTURE_CUBE_MAP_ARRAY,
-        TextureRectangle = GL_TEXTURE_RECTANGLE,
+        TextureBuffer = GL_TEXTURE_BUFFER,
     };
 
     enum class ProgramInterface1 : GLenum
@@ -792,25 +792,6 @@ namespace Nova
             glNamedFramebufferTexture(framebuffer, (GLenum)attachment, texture, level);
         }
 
-        /// <summary>
-        /// Simultaneously specify storage for all levels of a two-dimensional or one-dimensional array texture.
-        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glTexStorage2D.xhtml
-        /// </summary>
-        /// <param name="texture">Specifies the texture object name.</param>
-        /// <param name="levels">Specify the number of texture levels.</param>
-        /// <param name="internalFormat">Specifies the sized internal format to be used to store texture image data.</param>
-        /// <param name="width">Specifies the width of the texture, in texels.</param>
-        /// <param name="height">Specifies the height of the texture, in texels.</param>
-        inline void TextureStorage2D(
-            GLuint texture,
-            GLsizei levels,
-            InternalFormat internalFormat,
-            GLsizei width,
-            GLsizei height) noexcept
-        {
-            glTextureStorage2D(texture, levels, (GLenum)internalFormat, width, height);
-        }
-
         // TODO Add docs for TextureParameter
 
         inline void TextureParameter(GLuint texture, TextureParameterName parameter, GLfloat value) noexcept
@@ -954,6 +935,32 @@ namespace Nova
         inline void Disable(EnableCap cap) noexcept
         {
             glDisable((GLenum)cap);
+        }
+
+        /// @brief Create texture object.
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glCreateTextures.xhtml
+        /// @param target Specifies the effective texture target of created texture.
+        /// @return Previously unused texture name, representing a new texture object of the dimensionality and type specified by target and initialized to the default values for that texture type.
+        inline GLuint CreateTexture(TextureTarget target)
+        {
+            GLuint id = 0;
+            glCreateTextures((GLenum)target, 1, &id);
+
+            return id;
+        }
+
+        /// @brief Simultaneously specify storage for all levels of a two-dimensional or one-dimensional array texture.
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glTexStorage2D.xhtml
+        /// @param texture Specifies the texture object name.
+        /// @param levels Specify the number of texture levels.
+        /// @param internalformat Specifies the sized internal format to be used to store texture image data.
+        /// @param width Specifies the width of the texture, in texels.
+        /// @param height Specifies the height of the texture, in texels. 
+        inline void TextureStorage2D(GLuint texture, GLsizei levels, InternalFormat internalformat, GLsizei width, GLsizei height)
+        {
+            glTextureStorage2D(texture, levels, (GLenum)internalformat, width, height);
         }
 	}
 
