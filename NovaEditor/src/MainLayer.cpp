@@ -31,15 +31,15 @@ struct HeartData
 
 static std::vector<HeartData> hearts_;
 
-static float RandomFloat(float min = 0.0f, float max = 1.0f) noexcept
-{
-    return ((float)std::rand() / (float)RAND_MAX) * (max - min) + min;
-}
-
 template <typename T>
 static T Random(T min = std::numeric_limits<T>::min(), T max = std::numeric_limits<T>::max()) noexcept
 {
     return (T)(((float)std::rand() / (float)RAND_MAX) * (max - min) + min);
+}
+
+static float RandomFloat(float min = 0.0f, float max = 1.0f) noexcept
+{
+    return Random(min, max);
 }
 
 static glm::vec4 RandomColor(bool randomizeAlpha = false) noexcept
@@ -48,7 +48,7 @@ static glm::vec4 RandomColor(bool randomizeAlpha = false) noexcept
         RandomFloat(0.5f),
         RandomFloat(0.5f),
         RandomFloat(0.5f),
-        randomizeAlpha ? RandomFloat() : 1.0f);
+        RandomFloat() > 0.5f ? RandomFloat(0.3f, 0.6f) : 1.0f);
 }
 
 template <typename T>
@@ -263,6 +263,7 @@ MainLayer::MainLayer()
         randomMaterials_.emplace_back(
             Nova::Material{
                 .Color = RandomColor(),
+                .SpecularIntensity = 1.0f,
             });
     
     hearts_.reserve(5 * 5);

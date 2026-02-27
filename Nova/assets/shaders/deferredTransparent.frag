@@ -1,5 +1,11 @@
 #version 450 core
 
+struct Material
+{
+	vec4 color;
+	float specularIntensity;
+};
+
 struct PointLight
 {
     vec4 color;
@@ -13,13 +19,13 @@ struct DirLight
     vec3 direction;
 };
 
+in flat uint vsMaterialIndex;
+in vec3 vsPosition;
+in vec3 vsNormal;
+// in vec2 vsTexCoord;
+
 layout(location=3) out vec4 outColor;
 
-in vec2 vsTexCoord;
-
-layout(binding=0) uniform sampler2D uGBufferAlbedoSpecular;
-layout(binding=1) uniform sampler2D uGBufferPosition;
-layout(binding=2) uniform sampler2D uGBufferNormal;
 uniform float uAmbient;
 uniform float uShininess;
 uniform uint uPointLightsCount;
@@ -32,25 +38,31 @@ layout(std140) uniform uCameraData
 	vec3 cameraPosition;
 };
 
-layout(std430, binding = 1) readonly buffer sPointLightsBuffer
+layout(std430, binding = 1) readonly buffer sMaterialData
+{
+	Material materialData[];
+};
+
+layout(std430, binding = 2) readonly buffer sPointLightsBuffer
 {
 	PointLight pointLights[];
 };
 
-layout(std430, binding = 2) readonly buffer sDirLightsBuffer
+layout(std430, binding = 3) readonly buffer sDirLightsBuffer
 {
     DirLight dirLights[];
 };
 
 void main()
 {
-    vec3 fragPos = texture(uGBufferPosition, vsTexCoord).xyz;
-    vec3 normal = normalize(texture(uGBufferNormal, vsTexCoord).xyz);
-    vec4 albedoSpecular = texture(uGBufferAlbedoSpecular, vsTexCoord);
+	Material material = materialData[vsMaterialIndex];
+    vec3 baseColor = material.color.rgb;
+    float baseAlpha = material.color.a;
 
-    vec3 lighting = albedoSpecular.rgb * uAmbient;
-
-    vec3 viewDir = normalize(cameraPosition - fragPos);
+    vec3 normal = normalize(vsNormal);
+    
+    vec3 viewDir = normalize(cameraPosition - vsPosition);
+    vec3 lighting = baseColor * uAmbient;
 
     for (uint i = 0; i < uDirLightsCount; i++)
     {
@@ -62,11 +74,11 @@ void main()
 
         // diffuse
         float nDotL = max(dot(normal, l), 0.0);
-        vec3 diffuse = nDotL * albedoSpecular.rgb * light.color.rgb * light.color.a;
+        vec3 diffuse = nDotL * baseColor * light.color.rgb * light.color.a;
 
         // specular
         vec3 specular = pow(max(dot(normal, h), 0.0), uShininess) *
-            albedoSpecular.a *
+            material.specularIntensity * 
             light.color.rgb *
             light.color.a;
 
@@ -77,7 +89,7 @@ void main()
     {
         PointLight light = pointLights[i];
 
-        vec3 lightVec = light.position - fragPos;
+        vec3 lightVec = light.position - vsPosition;
         float dist = length(lightVec);
 
         if (dist < light.radius)
@@ -93,12 +105,12 @@ void main()
 
             // diffuse
             float nDotL = max(dot(normal, l), 0.0);
-            vec3 diffuse = nDotL * albedoSpecular.rgb * light.color.rgb * light.color.a;
+            vec3 diffuse = nDotL * baseColor * light.color.rgb * light.color.a;
 
             // specular
             vec3 specular = 
                 pow(max(dot(normal, h), 0.0), uShininess) *
-                albedoSpecular.a *
+                material.specularIntensity *
                 light.color.rgb *
                 light.color.a;
             
@@ -106,5 +118,5 @@ void main()
         }
     }
 
-    outColor = vec4(lighting, 1.0);
+	outColor = vec4(lighting, material.color.a);
 }

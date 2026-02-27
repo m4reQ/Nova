@@ -58,7 +58,7 @@ namespace Nova
 
         constexpr GLsizeiptr GetSize() const noexcept { return size_; }
 
-        constexpr GLsizeiptr GetDataSize() const noexcept { return (std::byte*)dataCurrent_ - (std::byte*)dataBase_; }
+        constexpr GLsizeiptr GetDataSize() const noexcept { return (uint8_t*)dataCurrent_ - (uint8_t*)dataBase_; }
 
         constexpr void* GetDataPtr() noexcept { return dataCurrent_; }
 

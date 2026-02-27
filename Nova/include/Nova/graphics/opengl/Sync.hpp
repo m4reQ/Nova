@@ -1,9 +1,11 @@
 #pragma once
 #include <Nova/graphics/opengl/GL.hpp>
 #include <utility>
+#include <array>
 
 namespace Nova
 {
+    constexpr size_t SyncHandlesCount = 3;
     constexpr size_t SyncTimeoutInfinite = -1;
     constexpr size_t SyncTimeoutImmediate = 0;
     constexpr size_t SyncInfiniteTimeoutThresholdNs = 1000;
@@ -16,7 +18,7 @@ namespace Nova
         constexpr Sync(const Sync&) = delete;
 
         constexpr Sync(Sync&& other) noexcept
-            : sync_(std::exchange(other.sync_, nullptr)) { }
+            : syncHandles_(std::exchange(other.syncHandles_, {0})) { }
 
         ~Sync() noexcept;
 
@@ -28,17 +30,18 @@ namespace Nova
 
         bool IsSignaled() const noexcept;
 
-        constexpr GLsync Get() const noexcept { return sync_; }
+        constexpr GLsync Get() const noexcept { return syncHandles_[currentSyncIndex_]; }
 
         constexpr Sync& operator=(Sync&& other) noexcept
         {
-            sync_ = std::exchange(other.sync_, nullptr);
+            syncHandles_ = std::exchange(other.syncHandles_, {0});
             return *this;
         }
 
         constexpr operator GLsync() const noexcept { return Get(); }
 
     private:
-        GLsync sync_ = nullptr;
+        std::array<GLsync, SyncHandlesCount> syncHandles_ = {0};
+        size_t currentSyncIndex_ = 0;
     };
 }
