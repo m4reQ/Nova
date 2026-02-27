@@ -10,6 +10,33 @@ namespace Nova
 {
     // TODO Add implicit casts to GLenum for strong typed enumerations
 
+    enum class DepthFunction : GLenum
+    {
+        /// @brief Never passes.
+        Never = GL_NEVER,
+
+        /// @brief Passes if the incoming depth value is less than the stored depth value.
+        Less = GL_LESS,
+
+        /// @brief Passes if the incoming depth value is equal to the stored depth value.
+        Equal = GL_EQUAL,
+
+        /// @brief Passes if the incoming depth value is less than or equal to the stored depth value.
+        LessEqual = GL_LEQUAL,
+
+        /// @brief Passes if the incoming depth value is greater than the stored depth value.
+        Greater = GL_GREATER,
+
+        /// @brief Passes if the incoming depth value is not equal to the stored depth value.
+        NotEqual = GL_NOTEQUAL,
+
+        /// @brief Passes if the incoming depth value is greater than or equal to the stored depth value.
+        GreaterEqual = GL_GEQUAL,
+
+        /// @brief Always passes.
+        Always = GL_ALWAYS,
+    };
+
     enum class BufferMapFlags : GLbitfield
     {
         /// @brief Indicates that the returned pointer may be used to read buffer object data.
@@ -961,6 +988,24 @@ namespace Nova
         inline void TextureStorage2D(GLuint texture, GLsizei levels, InternalFormat internalformat, GLsizei width, GLsizei height)
         {
             glTextureStorage2D(texture, levels, (GLenum)internalformat, width, height);
+        }
+
+        /// @brief enable or disable writing into the depth buffer
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glDepthMask.xhtml
+        /// @param flag Specifies whether the depth buffer is enabled for writing. If flag is false, depth buffer writing is disabled. Otherwise, it is enabled. Initially, depth buffer writing is enabled.
+        inline void DepthMask(bool flag) noexcept
+        {
+            glDepthMask((GLboolean)flag);
+        }
+
+        /// @brief Specify the value used for depth buffer comparisons.
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glDepthFunc.xhtml
+        /// @param func Specifies the depth comparison function.
+        inline void DepthFunc(DepthFunction func) noexcept
+        {
+            glDepthFunc((GLenum)func);
         }
 	}
 
