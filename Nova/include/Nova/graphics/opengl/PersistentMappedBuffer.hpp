@@ -32,7 +32,7 @@ namespace Nova
 
         ~PersistentMappedBuffer() noexcept;
 
-        GLsizeiptr Commit() noexcept;
+        GLsizeiptr Commit(bool wholeBuffer = false) noexcept;
 
         void Commit(GLintptr offset, GLsizeiptr length) noexcept;
 
@@ -64,9 +64,21 @@ namespace Nova
 
         constexpr const void* GetDataPtr() const noexcept { return dataCurrent_; }
 
-        constexpr void* GetBasePtr() noexcept { return dataBase_; }
+        template <typename T>
+        constexpr T* GetDataPtr() noexcept { return reinterpret_cast<T*>(dataCurrent_); }
 
-        constexpr const void* GetBasePtr() const noexcept { return dataBase_; }
+        template <typename T>
+        constexpr const T* GetDataPtr() const noexcept { return reinterpret_cast<const T*>(dataCurrent_); }
+
+        constexpr void* GetBasePtr(GLsizeiptr offsetBytes = 0) noexcept { return (uint8_t*)dataBase_ + offsetBytes; }
+
+        constexpr const void* GetBasePtr(GLsizeiptr offsetBytes = 0) const noexcept { return (const uint8_t*)dataBase_ + offsetBytes; }
+
+        template <typename T>
+        constexpr T* GetBasePtr(GLsizeiptr offsetBytes = 0) noexcept { return (T*)((uint8_t*)dataBase_ + offsetBytes); }
+
+        template <typename T>
+        constexpr const T* GetBasePtr(GLsizeiptr offsetBytes = 0) const noexcept { return (const T*)((const uint8_t*)dataBase_ + offsetBytes); }
 
         PersistentMappedBuffer& operator=(const PersistentMappedBuffer& other);
 

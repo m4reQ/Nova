@@ -99,9 +99,10 @@ void Application::Initialize(const ApplicationSettings &settings)
     Dotnet::Initialize_(settings.DotnetSettings);
     Window::Initialize_(settings.WindowSettings);
     Renderer::_Initialize(
-        Window::GetSize(),
-        settings.ShaderCacheDirectory,
-        Window::GetLoaderFunc_());
+        Window::GetWidth(),
+        Window::GetHeight(),
+        Window::GetLoaderFunc_(),
+        settings.RendererSettings);
 
     s_IsInitialized = true;
 }

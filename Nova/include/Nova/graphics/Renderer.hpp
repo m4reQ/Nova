@@ -6,11 +6,14 @@
 #include <Nova/graphics/opengl/GL.hpp>
 #include <Nova/graphics/Rect.hpp>
 #include <Nova/graphics/Material.hpp>
+#include <Nova/graphics/RendererSettings.hpp>
 #include <Nova/assets/Model.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 #include <utility>
+#include <filesystem>
+#include <optional>
 
 namespace Nova
 {
@@ -105,13 +108,8 @@ namespace Nova
 		void _Initialize(
 			int frameWidth,
 			int frameHeight,
-			const std::filesystem::path &shaderCacheDirectory,
-			GLADloadfunc getProcAddressFunc);
-
-		void _Initialize(
-			std::pair<int, int> frameSize,
-			const std::filesystem::path &shaderCacheDirectory,
-			GLADloadfunc getProcAddressFunc);
+			GLADloadfunc getProcAddressFunc,
+			const RendererSettings& settings);
 
 		void _Shutdown();
 	}

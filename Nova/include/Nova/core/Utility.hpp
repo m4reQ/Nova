@@ -4,6 +4,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <type_traits>
+#include <xxhash.h>
 
 #define NV_DEFINE_BITWISE_OPERATOR(type, _operator)                                            \
     constexpr type operator##_operator(type a, type b) noexcept                                \
@@ -72,6 +73,16 @@ namespace Nova
         std::size_t operator()(const char *str) const { return std::hash<std::string_view>{}(str); }
         std::size_t operator()(std::string_view str) const { return std::hash<std::string_view>{}(str); }
         std::size_t operator()(const std::string &str) const { return std::hash<std::string>{}(str); }
+    };
+
+    template <typename T>
+    struct XXHasher
+    {
+        XXH64_hash_t operator()(const T& value) const noexcept
+        {
+            static_assert(std::is_trivially_copyable_v<T>, "xxHash hasher can hash only POD structs.");
+            return XXH3_64bits(&value, sizeof(T));
+        }
     };
 
     template <typename T>

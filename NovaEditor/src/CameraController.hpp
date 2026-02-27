@@ -2,12 +2,15 @@
 #include <Nova/input/Input.hpp>
 #include <Nova/graphics/Window.hpp>
 #include <Nova/ecs/components/CameraComponent.hpp>
+#include <Nova/ecs/components/TransformComponent.hpp>
+#include <Nova/ecs/components/LightComponent.hpp>
 #include <Nova/ecs/components/ScriptController.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
-constexpr float CameraSpeed = 0.5f;
-constexpr double MouseSensitivity = 0.008f;
+constexpr float CameraSpeed = 0.3f;
+constexpr double MouseSensitivity = 0.001f;
+constexpr float ScrollSensitivity = 1.0f;
 
 class CameraController final : public ScriptController
 {
@@ -15,6 +18,7 @@ public:
     void OnAttach(entt::registry& scene, entt::entity parentEntity) override
     {
         camera_ = scene.try_get<CameraComponent>(parentEntity);
+        lightTransform_ = scene.try_get<TransformComponent>(parentEntity);
     }
 
     void OnMouseMove(const Nova::MouseMoveEvent& event) noexcept
@@ -40,9 +44,9 @@ public:
             return;
 
         camera_->Data.Perspective.FOV = glm::clamp(
-            camera_->Data.Perspective.FOV - (float)event.GetVertical(),
-            1.0f,
-            89.0f);
+            camera_->Data.Perspective.FOV - (float)glm::radians(event.GetVertical() * ScrollSensitivity),
+            0.018f,
+            1.57f);
     }
 
     void OnKey(const Nova::KeyEvent& event) noexcept
@@ -97,11 +101,14 @@ public:
             delta -= camera_->Up;
 
         camera_->Position += delta * CameraSpeed * (float)frametime;
+        lightTransform_->Position = camera_->Position;
     }
 
 private:
     CameraComponent* camera_;
+    TransformComponent* lightTransform_;
+
     float cameraPitch_ = 0.0f;
     float cameraYaw_ = glm::radians(-90.0f);
-    bool isMouseCaptured_;
+    bool isMouseCaptured_ = false;
 };

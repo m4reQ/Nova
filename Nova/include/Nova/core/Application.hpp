@@ -3,6 +3,7 @@
 #include <Nova/core/Layer.hpp>
 #include <Nova/core/Event.hpp>
 #include <Nova/graphics/Window.hpp>
+#include <Nova/graphics/RendererSettings.hpp>
 #include <Nova/dotnet/DotnetSettings.hpp>
 #include <vector>
 #include <concepts>
@@ -14,6 +15,7 @@ namespace Nova
     {
         WindowSettings WindowSettings;
         DotnetSettings DotnetSettings;
+        RendererSettings RendererSettings;
         std::filesystem::path ShaderCacheDirectory;
         size_t TextInputBufferSize;
     };

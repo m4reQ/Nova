@@ -3,7 +3,7 @@
 in flat uint vsMaterialIndex;
 in vec3 vsPosition;
 in vec3 vsNormal;
-	// in vec2 vsTexCoord;
+// in vec2 vsTexCoord;
 
 layout(location=0) out vec4 outColor;
 layout(location=1) out vec3 outPosition;

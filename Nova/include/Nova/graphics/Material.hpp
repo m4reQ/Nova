@@ -1,12 +1,17 @@
 #pragma once
 #include <cstdint>
+#include <cstring>
 #include <glm/vec4.hpp>
 
 namespace Nova
 {
     struct Material
 	{
-		size_t ID;
 		glm::vec4 Color;
 	};
+
+	inline bool operator==(const Material& a, const Material& b) noexcept
+	{
+		return a.Color == b.Color;
+	}
 }

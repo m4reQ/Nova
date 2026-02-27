@@ -6,7 +6,7 @@ namespace Nova
 {
     constexpr size_t SyncTimeoutInfinite = -1;
     constexpr size_t SyncTimeoutImmediate = 0;
-    constexpr size_t SyncInfiniteTimeoutThresholdNs = 100;
+    constexpr size_t SyncInfiniteTimeoutThresholdNs = 1000;
 
     class Sync
     {

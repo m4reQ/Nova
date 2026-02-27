@@ -36,13 +36,15 @@ PersistentMappedBuffer::~PersistentMappedBuffer() noexcept
     glDeleteBuffers(1, &id_);
 }
 
-GLsizeiptr PersistentMappedBuffer::Commit() noexcept
+GLsizeiptr PersistentMappedBuffer::Commit(bool wholeBuffer) noexcept
 {
     NV_PROFILE_FUNC;
 
-    const auto flushedDataSize = GetDataSize();
+    const auto flushedDataSize = wholeBuffer ? GetSize() : GetDataSize();
     
-    glFlushMappedNamedBufferRange(id_, 0, flushedDataSize);
+    if (flushedDataSize > 0)
+        glFlushMappedNamedBufferRange(id_, 0, flushedDataSize);
+        
     dataCurrent_ = dataBase_;
 
     return flushedDataSize;

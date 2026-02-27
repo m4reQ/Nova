@@ -262,7 +262,6 @@ MainLayer::MainLayer()
     for (size_t i = 0; i < 8; i++)
         randomMaterials_.emplace_back(
             Nova::Material{
-                .ID = i,
                 .Color = RandomColor(),
             });
     
@@ -298,7 +297,18 @@ MainLayer::MainLayer()
             glm::radians(45.0f),
             Nova::Window::GetAspectRatio(),
             0.001f,
-            3.0f));
+            10.0f));
+    entities_.emplace<TransformComponent>(
+        mainCameraEntity_,
+        TransformComponent {
+            .Position = {0.0f, 0.0f, 0.0f}});
+    entities_.emplace<PointLightComponent>(
+        mainCameraEntity_,
+        PointLightComponent{
+            .Color = {1.0f, 1.0f, 0.6f},
+            .Intensity = 0.9f,
+            .Radius = 0.7f
+        });
     auto& scriptComponent = entities_.emplace<CPPScriptComponent>(mainCameraEntity_, CPPScriptComponent::Create<CameraController>());
     scriptComponent.ControllerInstance->OnAttach(entities_, mainCameraEntity_);
 

@@ -7,17 +7,25 @@
 #include <Nova/graphics/opengl/Texture.hpp>
 #include <Nova/graphics/opengl/Framebuffer.hpp>
 #include <Nova/graphics/opengl/Sync.hpp>
+#include <Nova/graphics/opengl/AlignedType.hpp>
 #include <Nova/debug/Profile.hpp>
 #include <Nova/debug/Log.hpp>
+#include <Nova/core/Utility.hpp>
+#include <xxhash.h>
 #include <unordered_map>
 #include <stdexcept>
 #include <iostream>
 #include <format>
 
+#ifdef _DEBUG
+#define BREAK_ON_HIGH_SEVERITY(severity) assert((severity != GL_DEBUG_SEVERITY_HIGH) && "OpenGL error")
+#else
+#define BREAK_ON_HIGH_SEVERITY(severity)
+#endif
+
 using namespace Nova;
 
-constexpr GLuint c_MaxPointLights = 32;
-constexpr GLuint c_MaxDirLights = 2;
+constexpr auto MaterialHashSeed = 41925337ui64;
 
 struct PointLightData
 {
@@ -30,12 +38,7 @@ struct DirLightData
 {
 	glm::vec4 Color;
 	glm::vec3 Direction;
-};
-
-struct LightingData
-{
-	PointLightData PointLightsData[c_MaxPointLights];
-	DirLightData DirLightsData[c_MaxDirLights];
+	float _Padding[1];
 };
 
 struct DrawCommand
@@ -65,6 +68,7 @@ struct CameraData
 	glm::mat4 ViewMatrix;
 	glm::mat4 ProjectionMatrix;
 	glm::vec3 Position;
+	float _Padding[1];
 };
 
 struct DrawData
@@ -82,12 +86,27 @@ constexpr GLsizei c_ShadowMapHeight = 1024;
 constexpr GLsizei c_MaxShadowCasters = 8;
 
 static std::unordered_map<const Model*, DrawData> s_DrawData;
-static std::unordered_map<MaterialID, GLuint> s_Materials;
+
+static RendererInfo s_RendererInfo;
+
+// materials
+static PersistentMappedBuffer s_MaterialsBuffer;
+static std::unordered_map<Material, GLuint, XXHasher<Material>> s_Materials;
+
+// lights
+static PersistentMappedBuffer s_LightsBuffer;
+
+static PointLightData* s_PointLights;
+static GLuint s_PointLightsCount;
+static GLuint s_MaxPointLightsCount;
+
+static DirLightData* s_DirLights;
+static GLuint s_DirLightsCount;
+static GLuint s_MaxDirLightsCount;
+
+static PersistentMappedBuffer s_CameraDataBuffer;
 
 static PersistentMappedBuffer s_InstanceBuffer;
-static PersistentMappedBuffer s_CameraDataBuffer;
-static PersistentMappedBuffer s_LightsBuffer;
-static Buffer s_MaterialsBuffer;
 static ShaderProgram s_ShaderProgram;
 static ShaderProgram s_DeferredGeometryProgram;
 static ShaderProgram s_DeferredLightProgram;
@@ -96,20 +115,9 @@ static Texture s_WhiteTexture;
 static Framebuffer s_Framebuffer;
 static Sync s_FrameSync;
 static Sync s_InstanceDataSync;
-static RendererInfo s_RendererInfo;
-static LightingData* s_LightingData;
-static GLuint s_PointLightsCount;
-static GLuint s_DirLightsCount;
+static Sync s_GeometryPassSync;
 static GLsizei s_CurrentDisplayWidth;
 static GLsizei s_CurrentDisplayHeight;
-
-static void CacheMaterial(const Material& material)
-{
-	NV_PROFILE_FUNC;
-
-	s_Materials.insert({ material.ID, s_Materials.size() });
-	s_MaterialsBuffer.Store(material.Color);
-}
 
 static void ExecuteShadowMapPass() noexcept
 {
@@ -122,14 +130,22 @@ static GLuint GetMaterialIndex(const Material& material)
 {
 	NV_PROFILE_FUNC;
 
-	const auto& materialCacheEntry = s_Materials.find(material.ID);
-	if (materialCacheEntry != s_Materials.cend())
+	const auto it = s_Materials.find(material);
+	if (it != s_Materials.end())
 	{
-		return materialCacheEntry->second;
+		return it->second;
 	}
+	else
+	{
+		const auto dataPtr = s_MaterialsBuffer.GetDataPtr<Material>();
+		const auto basePtr = s_MaterialsBuffer.GetBasePtr<Material>();
+		const auto materialIndex = dataPtr - basePtr;
 
-	CacheMaterial(material);
-	return (GLuint)s_Materials.size() - 1;
+		s_MaterialsBuffer.Write(glm::value_ptr(material.Color), sizeof(glm::vec4));
+		s_Materials.emplace(material, (GLuint)materialIndex);
+
+		return materialIndex;
+	}
 }
 
 static ShaderProgram CreateBasicShaderProgram()
@@ -189,6 +205,8 @@ void Renderer::Render(
 {
 	NV_PROFILE_FUNC;
 
+	s_GeometryPassSync.WaitClient(SyncTimeoutInfinite);
+
 	InstanceData instanceData{
 		.MaterialIndex = GetMaterialIndex(material),
 		.Transform = transform,
@@ -218,12 +236,17 @@ void Renderer::SetCamera(
 {
     NV_PROFILE_FUNC;
 	
-	s_FrameSync.WaitClient(SyncTimeoutInfinite);
+	{
+		NV_PROFILE_SCOPE("::WaitForGeometryPassFinish");
+		s_GeometryPassSync.WaitClient(SyncTimeoutInfinite);
+	}
 
-	s_CameraDataBuffer.Write(glm::value_ptr(view), sizeof(glm::mat4));
-	s_CameraDataBuffer.Write(glm::value_ptr(projection), sizeof(glm::mat4));
-	s_CameraDataBuffer.Write(glm::value_ptr(position), sizeof(glm::vec3));
-	s_CameraDataBuffer.Commit();
+	auto cameraData = s_CameraDataBuffer.GetDataPtr<CameraData>();
+	cameraData->ViewMatrix = view;
+	cameraData->ProjectionMatrix = projection;
+	cameraData->Position = position;
+
+	s_CameraDataBuffer.Commit(true);
 }
 
 const RendererInfo& Renderer::GetInfo() noexcept
@@ -252,29 +275,25 @@ void Renderer::AddPointLight(const glm::vec4& color, const glm::vec3& position, 
 {
 	NV_PROFILE_FUNC;
 
-	if (s_PointLightsCount >= c_MaxPointLights)
+	if (s_PointLightsCount >= s_MaxPointLightsCount)
 		return;
 
-	auto& data = s_LightingData->PointLightsData[s_PointLightsCount];
+	auto& data = s_PointLights[s_PointLightsCount++];
 	data.Color = color;
 	data.Position = position;
 	data.Radius = radius;
-
-	s_PointLightsCount++;
 }
 
 void Renderer::AddDirectionalLight(const glm::vec4& color, const glm::vec3& direction)
 {
 	NV_PROFILE_FUNC;
 
-	if (s_DirLightsCount >= c_MaxDirLights)
+	if (s_DirLightsCount >= s_MaxDirLightsCount)
 		return;
 
-	auto& data = s_LightingData->DirLightsData[s_DirLightsCount];
+	auto& data = s_DirLights[s_DirLightsCount++];
 	data.Color = color;
 	data.Direction = direction;
-
-	s_DirLightsCount++;
 }
 
 void Renderer::SetClearColor(float r, float g, float b, float a) noexcept
@@ -341,28 +360,15 @@ static void DrawBatch(const Model* model, DrawData& data) noexcept
 	data.InstanceData.clear();
 }
 
-void Renderer::Draw(const glm::vec4& clearColor)
+static void ExecuteGeometryPass() noexcept
 {
 	NV_PROFILE_FUNC;
 
-	s_Framebuffer.Resize(s_CurrentDisplayWidth, s_CurrentDisplayHeight);
-	
-	GL::Disable(EnableCap::Blend);
-	GL::Enable(EnableCap::DepthTest);
-	glDepthMask(GL_TRUE);
-	glDepthFunc(GL_LEQUAL);
-	
-	s_Framebuffer.Bind();
-	s_Framebuffer.ClearAttachment(0, clearColor);
-	s_Framebuffer.ClearAttachment(1, glm::zero<glm::vec4>());
-	s_Framebuffer.ClearAttachment(2, glm::zero<glm::vec4>());
-	s_Framebuffer.ClearAttachment(3, glm::zero<glm::vec4>());
-	s_Framebuffer.ClearAttachment(1.0f, 0);
-
+	s_MaterialsBuffer.Commit();
 	s_MaterialsBuffer.Bind(
-		BindingTarget::ShaderStorageBuffer,
+		BufferBaseTarget::ShaderStorageBuffer,
 		s_DeferredGeometryProgram.GetResourceLocation("sMaterialData"));
-
+	
 	s_CameraDataBuffer.Bind(
 		BufferBaseTarget::UniformBuffer,
 		s_DeferredGeometryProgram.GetResourceLocation("uCameraData"));
@@ -371,8 +377,24 @@ void Renderer::Draw(const glm::vec4& clearColor)
 
 	s_DeferredGeometryProgram.Use();
 
+	GL::Disable(EnableCap::Blend);
+	GL::Enable(EnableCap::DepthTest);
+	GL::DepthFunc(DepthFunction::Less);
+
+	bool anyBatchDrawn = false;
 	for (auto& [model, drawData] : s_DrawData)
+	{
 		DrawBatch(model, drawData);
+		anyBatchDrawn = true;
+	}
+
+	if (anyBatchDrawn)
+		s_GeometryPassSync.Set();
+}
+
+static void ExecuteLightingPass() noexcept
+{
+	NV_PROFILE_FUNC;
 
 	s_DeferredLightProgram.SetUniform("uAmbient", 0.3f);
 	s_DeferredLightProgram.SetUniform("uShininess", 86.0f);
@@ -382,28 +404,28 @@ void Renderer::Draw(const glm::vec4& clearColor)
 
 	s_FrameSync.WaitClient();
 	
+	s_LightsBuffer.Commit(
+		0,
+		sizeof(PointLightData) * s_PointLightsCount);
 	s_LightsBuffer.Bind(
 		BufferBaseTarget::ShaderStorageBuffer,
 		s_DeferredLightProgram.GetResourceLocation("sPointLightsBuffer"),
-		offsetof(LightingData, PointLightsData),
-		sizeof(PointLightData) * c_MaxPointLights);
+		0,
+		sizeof(PointLightData) * s_MaxPointLightsCount);
+	
 	s_LightsBuffer.Commit(
-		offsetof(LightingData, PointLightsData),
-		sizeof(PointLightData) * s_PointLightsCount);
-
+		sizeof(PointLightData) * s_MaxPointLightsCount,
+		sizeof(DirLightData) * s_DirLightsCount);
 	s_LightsBuffer.Bind(
 		BufferBaseTarget::ShaderStorageBuffer,
 		s_DeferredLightProgram.GetResourceLocation("sDirLightsBuffer"),
-		offsetof(LightingData, DirLightsData),
-		sizeof(DirLightData) * c_MaxDirLights);
-	s_LightsBuffer.Commit(
-		offsetof(LightingData, DirLightsData),
-		sizeof(DirLightData) * s_DirLightsCount);
-
+		sizeof(PointLightData) * s_MaxPointLightsCount,
+		sizeof(DirLightData) * s_MaxDirLightsCount);
+	
 	s_CameraDataBuffer.Bind(
 		BufferBaseTarget::UniformBuffer,
 		s_DeferredLightProgram.GetResourceLocation("uCameraData"));
-	
+
 	const std::array<GLuint, 3> gBufferTextureIDs {
 		s_Framebuffer.GetAttachment(0).AttachmentID,
 		s_Framebuffer.GetAttachment(1).AttachmentID,
@@ -411,17 +433,37 @@ void Renderer::Draw(const glm::vec4& clearColor)
 	};
 
 	glBindTextures(0, gBufferTextureIDs.size(), gBufferTextureIDs.data());
-	
+
 	GL::Disable(EnableCap::DepthTest);
-	glDepthMask(GL_FALSE);
+	GL::DepthMask(false);
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	s_FrameSync.Set();
+}
+
+void Renderer::Draw(const glm::vec4& clearColor)
+{
+	NV_PROFILE_FUNC;
+
+	GL::DepthMask(true);
+	
+	s_Framebuffer.Resize(s_CurrentDisplayWidth, s_CurrentDisplayHeight);
+	s_Framebuffer.Bind();
+	s_Framebuffer.ClearAttachment(0, clearColor);
+	s_Framebuffer.ClearAttachment(1, glm::zero<glm::vec4>());
+	s_Framebuffer.ClearAttachment(2, glm::zero<glm::vec4>());
+	s_Framebuffer.ClearAttachment(3, glm::zero<glm::vec4>());
+	s_Framebuffer.ClearAttachment(1.0f, 0);
+
+	ExecuteGeometryPass();
+	ExecuteLightingPass();
+
 	s_Framebuffer.Unbind();
 
 	s_PointLightsCount = 0;
 	s_DirLightsCount = 0;
+	s_Materials.clear();
 }
 
 GLuint Renderer::GetRenderTextureID(RenderTexture texture) noexcept
@@ -429,16 +471,30 @@ GLuint Renderer::GetRenderTextureID(RenderTexture texture) noexcept
 	return s_Framebuffer.GetAttachment((size_t)texture).AttachmentID;
 }
 
+void Renderer::DisplayFramebuffer() noexcept
+{
+	s_Framebuffer.Blit(Attachment::Color0);
+}
+
+void Renderer::SetDisplaySize(int width, int height) noexcept
+{
+	s_CurrentDisplayWidth = width;
+	s_CurrentDisplayHeight = height;
+}
+
 void Renderer::_Initialize(
 	int frameWidth,
 	int frameHeight,
-	const std::filesystem::path& shaderCacheDirectory,
-	GLADloadfunc getProcAddressFunc)
+	GLADloadfunc getProcAddressFunc,
+	const RendererSettings& settings)
 {
 	NV_PROFILE_FUNC;
 
 	s_CurrentDisplayWidth = frameWidth;
 	s_CurrentDisplayHeight = frameHeight;
+
+	s_MaxPointLightsCount = settings.MaxPointLights;
+	s_MaxDirLightsCount = settings.MaxDirectionalLights;
 
 	if (!gladLoadGL(getProcAddressFunc))
 		throw std::runtime_error("Failed to load OpenGL bindings.");
@@ -450,18 +506,12 @@ void Renderer::_Initialize(
 	GL::Enable(EnableCap::CullFace);
 	GL::Enable(EnableCap::DebugOutput);
 	GL::Enable(EnableCap::DebugOutputSynchronous);
-
 	glFrontFace(GL_CCW);
 	glCullFace(GL_BACK);
-
 	glDebugMessageCallback(
 		[](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei, const GLchar* message, const void*)
 		{
-#ifdef _DEBUG
-			if (severity == GL_DEBUG_SEVERITY_HIGH)
-				assert(false && "Opengl error");
-#endif
-
+			BREAK_ON_HIGH_SEVERITY(severity);
 			NV_LOG_INFO("OpenGL: {}.\n", message);
 		},
 		nullptr);
@@ -483,12 +533,18 @@ void Renderer::_Initialize(
 		BufferAccessFlags::Writable);
 	s_CameraDataBuffer.SetDebugName("CameraBuffer");
 	
-	s_MaterialsBuffer = Buffer(sizeof(glm::vec4) * 32, true);
+	s_MaterialsBuffer = PersistentMappedBuffer(
+		sizeof(Material) * settings.MaxMaterials,
+		BufferAccessFlags::Writable);
 	s_MaterialsBuffer.SetDebugName("MaterialsBuffer");
 
-	s_LightsBuffer = PersistentMappedBuffer(sizeof(LightingData), BufferAccessFlags::Writable);
+	s_LightsBuffer = PersistentMappedBuffer(
+		sizeof(PointLightData) * settings.MaxPointLights + sizeof(DirLightData) * settings.MaxDirectionalLights,
+		BufferAccessFlags::Writable);
 	s_LightsBuffer.SetDebugName("LightsBuffer");
-	s_LightingData = static_cast<LightingData*>(s_LightsBuffer.GetBasePtr());
+
+	s_PointLights = s_LightsBuffer.GetBasePtr<PointLightData>();
+	s_DirLights = s_LightsBuffer.GetBasePtr<DirLightData>(sizeof(PointLightData) * settings.MaxPointLights);
 
 	s_VertexArray = VertexArray({
 		VertexInput {
@@ -569,29 +625,6 @@ void Renderer::_Initialize(
 			.Flags = AttachmentFlags::Resizable | AttachmentFlags::DrawDest,
 		}, // final output
 	});
-}
-
-void Renderer::DisplayFramebuffer() noexcept
-{
-	s_Framebuffer.Blit(Attachment::Color0);
-}
-
-void Renderer::SetDisplaySize(int width, int height) noexcept
-{
-	s_CurrentDisplayWidth = width;
-	s_CurrentDisplayHeight = height;
-}
-
-void Renderer::_Initialize(
-	std::pair<int, int> frameSize,
-	const std::filesystem::path& shaderCacheDirectory,
-	GLADloadfunc getProcAddressFunc)
-{
-	_Initialize(
-		frameSize.first,
-		frameSize.second,
-		shaderCacheDirectory,
-		getProcAddressFunc);
 }
 
 void Renderer::_Shutdown()

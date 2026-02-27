@@ -996,7 +996,7 @@ namespace Nova
         /// @param flag Specifies whether the depth buffer is enabled for writing. If flag is false, depth buffer writing is disabled. Otherwise, it is enabled. Initially, depth buffer writing is enabled.
         inline void DepthMask(bool flag) noexcept
         {
-            glDepthMask((GLboolean)flag);
+            glDepthMask(flag ? GL_TRUE : GL_FALSE);
         }
 
         /// @brief Specify the value used for depth buffer comparisons.
