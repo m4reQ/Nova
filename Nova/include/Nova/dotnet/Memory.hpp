@@ -1,6 +1,7 @@
 #pragma once
 #include <Nova/core/Build.hpp>
 #include <Windows.h>
+#include <objbase.h>
 #include <utility>
 #include <memory>
 #include <span>

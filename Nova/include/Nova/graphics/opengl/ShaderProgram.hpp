@@ -1,8 +1,10 @@
 #pragma once
 #include <Nova/graphics/opengl/Buffer.hpp>
 #include <Nova/graphics/opengl/ShaderStage.hpp>
+#include <Nova/core/Utility.hpp>
 #include <glm/vec3.hpp>
 #include <span>
+#include <string>
 #include <string_view>
 #include <optional>
 #include <filesystem>

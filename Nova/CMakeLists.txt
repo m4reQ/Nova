@@ -44,10 +44,10 @@ target_include_directories(
 add_dependencies(
     Nova
     NovaHost)
-# target_precompile_headers(
-#     Nova
-#     PRIVATE
-#     "${CMAKE_CURRENT_SOURCE_DIR}/pch.hpp")
+target_precompile_headers(
+    Nova
+    PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/pch.hpp")
 
 add_custom_command(
     TARGET Nova

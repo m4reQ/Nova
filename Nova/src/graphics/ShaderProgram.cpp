@@ -11,7 +11,6 @@
 
 using namespace Nova;
 
-#pragma pack(push, 1)
 struct ResourceProps
 {
 	GLint Location;
@@ -19,7 +18,6 @@ struct ResourceProps
 
 	static constexpr const std::array<GLenum, 2> Names{GL_LOCATION, GL_NAME_LENGTH};
 };
-#pragma pack(pop)
 
 static ProgramBinary RetrieveProgramBinary(GLuint programID)
 {
