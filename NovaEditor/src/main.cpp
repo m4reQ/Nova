@@ -1,7 +1,5 @@
 #include <Nova/core/Application.hpp>
-#include <Nova/dotnet/Assembly.hpp>
 #include "MainLayer.hpp"
-#include "OverlayLayer.hpp"
 #include <iostream>
 
 int main()
