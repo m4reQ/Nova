@@ -1,51 +1,103 @@
 #pragma once
-#include <Nova/core/Utility.hpp>
-#include <Nova/graphics/opengl/GLObject.hpp>
-#include <type_traits>
-#include <concepts>
+#include <Nova/graphics/opengl/GL.hpp>
+#include <glm/vec3.hpp>
+#include <utility>
+#include <span>
 
 namespace Nova
 {
-	struct TextureID : public StrongTypedef<TextureID, GLuint>
+	struct TextureWrapping
 	{
-		using StrongTypedef::StrongTypedef;
+		TextureWrapMode R = TextureWrapMode::ClampToEdge;
+		TextureWrapMode S = TextureWrapMode::ClampToEdge;
+		TextureWrapMode T = TextureWrapMode::ClampToEdge;
 	};
 
-	class Texture : public GLObject<GL_TEXTURE, TextureID>
+	struct TextureSpec
+	{
+		glm::ivec3 Size;
+		TextureWrapping Wrapping = {
+			.R = TextureWrapMode::ClampToEdge,
+			.S = TextureWrapMode::ClampToEdge,
+			.T = TextureWrapMode::ClampToEdge,
+		};
+		InternalFormat Format;
+		GLsizei Mipmaps = 1;
+		TextureMinFilter MinFilter = TextureMinFilter::Nearest;
+		TextureMagFilter MagFilter = TextureMagFilter::Nearest;
+		bool AllowBindless = false;
+	};
+
+	struct TextureUploadInfo
+	{
+		glm::ivec3 Size;
+		glm::ivec3 Offset;
+		GLint Mipmap;
+		PixelFormat PixelFormat;
+		PixelType PixelType;
+	};
+
+	class Texture
 	{
 	public:
-		constexpr static Texture &GetWhiteTexture() noexcept
-		{
-			return s_WhiteTexture;
-		}
-
-		static void InitializeWhiteTexture() noexcept;
-
-		template <HasArrayInterface<GLuint> T>
-		static void BindTextures(const T &textureIDs, GLuint first = 0) noexcept
-		{
-			glBindTextures(first, textureIDs.size(), textureIDs.data());
-		}
-
-		template <size_t N>
-		static void BindTextures(const std::array<Texture, N> &textures, GLuint first = 0) noexcept
-		{
-			std::array<GLuint, N> textureIDs;
-			for (const auto &texture : textures)
-			{
-				textureIDs.emplace_back((GLuint)texture.GetID());
-			}
-
-			BindTextures(textureIDs, first);
-		}
-
 		Texture() = default;
 
-		void BindToUnit(GLuint unit) const noexcept;
+		Texture(TextureTarget target, const TextureSpec& spec);
 
-		void Delete() noexcept override;
+		constexpr Texture(Texture&& other) noexcept
+			: id_(std::exchange(other.id_, 0)),
+			  bindlessHandle_(std::exchange(other.bindlessHandle_, 0)),
+			  spec_(other.spec_),
+			  target_(other.target_) { }
 
+		Texture(const Texture&) = delete;
+
+		~Texture() noexcept;
+
+		void Upload(const TextureUploadInfo& info, const void* data) const noexcept;
+
+		void UploadFromPBO() const noexcept;
+		
+		void Bind(GLuint unit) const noexcept;
+
+		void MakeResident() const noexcept;
+
+		void MakeNonResident() const noexcept;
+
+		constexpr const TextureSpec& GetSpecification() const noexcept { return spec_; }
+
+		constexpr GLuint GetID() const noexcept { return id_; }
+
+		constexpr GLuint64 GetBindlessHandle() const noexcept { return bindlessHandle_; }
+
+		constexpr bool SupportsBindless() const noexcept { return bindlessHandle_ != 0; }
+
+		constexpr GLsizei GetWidth() const noexcept { return spec_.Size.x; }
+
+		constexpr GLsizei GetHeight() const noexcept { return spec_.Size.y; }
+
+		constexpr GLsizei GetDepth() const noexcept { return spec_.Size.z; }
+
+		constexpr TextureTarget GetTarget() const noexcept { return target_; }
+
+		constexpr InternalFormat GetFormat() const noexcept { return spec_.Format; }
+
+		constexpr operator GLuint() const noexcept { return id_; }
+
+		constexpr Texture& operator=(Texture&& other) noexcept
+		{
+			id_ = std::exchange(other.id_, 0);
+			bindlessHandle_ = std::exchange(other.bindlessHandle_, 0);
+			spec_ = other.spec_;
+			target_ = other.target_;
+
+			return *this;
+		}
+		
 	private:
-		static Texture s_WhiteTexture;
+		TextureSpec spec_;
+		GLuint64 bindlessHandle_ = 0;
+		GLuint id_ = 0;
+		TextureTarget target_;
 	};
 }

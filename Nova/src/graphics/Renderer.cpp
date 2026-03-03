@@ -41,24 +41,9 @@ struct DirLightData
 	float _Padding[1];
 };
 
-struct DrawCommand
-{
-	GLuint Count;
-	GLuint InstanceCount;
-	GLuint BaseIndex;
-	GLint BaseVertex;
-	GLuint BaseInstance;
-};
-
-struct DataOffsets
-{
-	GLuint VertexOffset;
-	GLuint IndexOffset;
-};
-
 struct InstanceData
 {
-	GLuint MaterialIndex;
+	glm::uvec3 BindlessHandleMaterialIndex;
 	glm::mat4 Transform;
 	glm::mat3 NormalTransform;
 };
@@ -69,6 +54,14 @@ struct CameraData
 	glm::mat4 ProjectionMatrix;
 	glm::vec3 Position;
 	float _Padding[1];
+};
+
+struct MaterialData
+{
+	glm::vec4 Color;
+	float SpecularIntensity;
+	float Shininess;
+	GLuint TextureIndex;
 };
 
 struct DrawData
@@ -241,10 +234,16 @@ void Renderer::Render(
 {
 	NV_PROFILE_FUNC;
 
+	const auto bindlessHandle = s_WhiteTexture.GetBindlessHandle();
+
 	auto& instanceDataStore = GetModelInstanceDataStore(model, !glm::epsilonEqual(material.Color.a, 1.0f, glm::epsilon<float>()));
 	instanceDataStore.emplace_back(
 		InstanceData {
-			.MaterialIndex = GetMaterialIndex(material),
+			.BindlessHandleMaterialIndex = {
+				(uint32_t)(bindlessHandle & 0xffffffffui32),
+				(uint32_t)(bindlessHandle >> 32ui32),
+				GetMaterialIndex(material),
+			},
 			.Transform = transform,
 			.NormalTransform = BuildNormalTransformMatrix(transform),
 		});
@@ -579,13 +578,40 @@ void Renderer::_Initialize(
 	glDebugMessageCallback(
 		[](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei, const GLchar* message, const void*)
 		{
-			BREAK_ON_HIGH_SEVERITY(severity);
-			NV_LOG_INFO("OpenGL: {}.\n", message);
+			switch (severity)
+			{
+			case GL_DEBUG_SEVERITY_HIGH:
+#ifdef _DEBUG
+				__debugbreak();
+#endif
+				break;
+			case GL_DEBUG_SEVERITY_MEDIUM:
+				NV_LOG_WARNING("OpenGL: {}.\n", message);
+				break;
+			case GL_DEBUG_SEVERITY_LOW:
+				NV_LOG_INFO("OpenGL: {}.\n", message);
+				break;
+			}
 		},
 		nullptr);
 
 	const Rect viewportRect { 0, 0, frameWidth, frameHeight };
 	SetViewport(viewportRect, viewportRect);
+
+	const std::array<uint8_t, 4> whiteTextureData{ 255, 255, 255, 255 };
+	s_WhiteTexture = Texture(
+		TextureTarget::Texture2D,
+		TextureSpec {
+			.Size = {1, 1, 0},
+			.Format = InternalFormat::RGBA8,
+			.AllowBindless = true});
+	s_WhiteTexture.Upload(
+		TextureUploadInfo {
+			.Size = {1, 1, 0},
+			.PixelFormat = PixelFormat::RGBA,
+			.PixelType = PixelType::UnsignedByte },
+		whiteTextureData.data());
+	s_WhiteTexture.MakeResident();
 
 	s_DeferredGeometryProgram = CreateDeferredGeometryShaderProgram();
 	s_DeferredLightProgram = CreateDeferredLightingShaderProgram();
@@ -628,20 +654,20 @@ void Renderer::_Initialize(
 					.AttributeType = AttributeType::Float,
 					.Count = 3,
 				},
-				// VertexDescriptor {
-				// 	.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inTexCoord"),
-				// 	.AttributeType = AttributeType::Float,
-				// 	.Count = 2,
-				// },
+				VertexDescriptor {
+					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inTexCoord"),
+					.AttributeType = AttributeType::Float,
+					.Count = 2,
+				},
 			},
 		},
 		VertexInput {
 			.Stride = sizeof(InstanceData),
 			.Descriptors = {
 				VertexDescriptor {
-					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inMaterialIndex"),
+					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inBindlessHandleMaterialIndex"),
 					.AttributeType = AttributeType::UnsignedInt,
-					.Count = 1
+					.Count = 3,
 				},
 				VertexDescriptor {
 					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inTransform"),

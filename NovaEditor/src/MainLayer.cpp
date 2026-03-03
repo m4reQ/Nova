@@ -3,6 +3,7 @@
 #include <Nova/graphics/Renderer.hpp>
 #include <Nova/input/Input.hpp>
 #include <Nova/core/Application.hpp>
+#include <Nova/debug/Profile.hpp>
 #include <Nova/ecs/components/NameComponent.hpp>
 #include <Nova/ecs/components/TransformComponent.hpp>
 #include <Nova/ecs/components/LightComponent.hpp>
@@ -222,7 +223,9 @@ static void RenderScene(const entt::registry& scene, entt::entity cameraEntity)
         });
 
     // render objects
-    scene.view<TransformComponent, RenderComponent>().each(
+    {
+        NV_PROFILE_SCOPE("::RenderObjects");
+        scene.view<TransformComponent, RenderComponent>().each(
         [](auto entity, const auto& transform, const auto& render)
         {
             Nova::Renderer::Render(
@@ -233,6 +236,8 @@ static void RenderScene(const entt::registry& scene, entt::entity cameraEntity)
                     transform.Rotation,
                     transform.Scale));
         });
+    }
+    
 
     // draw
     // Nova::Renderer::Draw(glm::vec4(0.529f, 0.529f, 0.529f, 1.0f));
@@ -486,7 +491,14 @@ void MainLayer::OnRender()
     ImGui::PopStyleVar(2);
 
     ImGui::Render();
-
+    
+    const Nova::Rect<int> viewport {
+        .X = 0,
+        .Y = 0,
+        .Width = Nova::Window::GetWidth(),
+        .Height = Nova::Window::GetHeight(),
+    };
+    Nova::Renderer::SetViewport(viewport, viewport);
     Nova::Renderer::Clear();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

@@ -1,16 +1,93 @@
 #include <Nova/graphics/opengl/Texture.hpp>
+#include <Nova/debug/Profile.hpp>
+#include <stdexcept>
 
 using namespace Nova;
 
-Texture Texture::s_WhiteTexture;
-
-void Texture::BindToUnit(GLuint unit) const noexcept
+static void CreateTextureStorage(TextureTarget target, GLuint texture, const TextureSpec& spec) noexcept
 {
-    glBindTextureUnit(unit, (GLuint)m_ID);
+    NV_PROFILE_FUNC;
+
+    switch (target)
+    {
+    case TextureTarget::Texture2D:
+    case TextureTarget::Texture1DArray:
+        GL::TextureStorage2D(
+            texture,
+            spec.Mipmaps,
+            spec.Format,
+            spec.Size.x,
+            spec.Size.y);
+        break;
+    }
 }
 
-void Texture::Delete() noexcept
+Texture::Texture(TextureTarget target, const TextureSpec& spec)
+    : target_(target), spec_(spec)
 {
-    glDeleteTextures(1, &m_ID);
-    m_ID = 0;
+    NV_PROFILE_FUNC;
+
+    id_ = GL::CreateTexture(target);
+    GL::TextureParameter(id_, spec.MinFilter);
+    GL::TextureParameter(id_, spec.MagFilter);
+    GL::TextureParameter(id_, TextureParameterName::TextureWrapR, (GLint)spec.Wrapping.R);
+    GL::TextureParameter(id_, TextureParameterName::TextureWrapS, (GLint)spec.Wrapping.S);
+    GL::TextureParameter(id_, TextureParameterName::TextureWrapT, (GLint)spec.Wrapping.T);
+    
+    constexpr GLfloat borderColor[4] {1.0f, 1.0f, 1.0f, 1.0f};
+    glTextureParameterfv(id_, GL_TEXTURE_BORDER_COLOR, borderColor);
+    
+    CreateTextureStorage(target, id_, spec);
+
+    GLint isImmutable = GL_FALSE;
+    glGetTextureParameteriv(id_, GL_TEXTURE_IMMUTABLE_FORMAT, &isImmutable);
+    if (!isImmutable)
+        throw std::runtime_error("Failed to create texture.");
+
+    if (spec.AllowBindless)
+    {
+        bindlessHandle_ = glGetTextureHandleARB(id_);
+        if (!bindlessHandle_)
+            throw std::runtime_error("Failed to create bindless texture.");
+    }
+}
+
+Texture::~Texture() noexcept
+{
+    glDeleteTextures(1, &id_);
+}
+
+void Texture::Bind(GLuint unit) const noexcept
+{
+    glBindTextureUnit(unit, id_);
+}
+
+void Texture::MakeResident() const noexcept
+{
+    glMakeTextureHandleResidentARB(bindlessHandle_);
+}
+
+void Texture::MakeNonResident() const noexcept
+{
+    glMakeTextureHandleNonResidentARB(bindlessHandle_);
+}
+
+void Texture::Upload(const TextureUploadInfo& info, const void* data) const noexcept
+{
+    GL::TextureSubImage2D(
+        id_,
+        info.Mipmap,
+        info.Offset.x,
+        info.Offset.y,
+        info.Size.x,
+        info.Size.y,
+        info.PixelFormat,
+        info.PixelType,
+        data);
+    glGenerateTextureMipmap(id_);
+}
+
+void Texture::UploadFromPBO() const noexcept
+{
+
 }

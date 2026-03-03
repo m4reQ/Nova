@@ -1,16 +1,18 @@
 #version 450 core
+#extension GL_ARB_bindless_texture : require
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
-// layout(location = 2) in vec2 inTexCoord;
-layout(location = 3) in uint inMaterialIndex;
+layout(location = 2) in vec2 inTexCoord;
+layout(location = 3) in uvec3 inBindlessHandleMaterialIndex;
 layout(location = 4) in mat4 inTransform;
 layout(location = 8) in mat3 inNormalTransform;
 
 out flat uint vsMaterialIndex;
+out flat uvec2 vsBindlessTextureHandle;
 out vec3 vsPosition;
 out vec3 vsNormal;
-// out vec2 vsTexCoord;
+out vec2 vsTexCoord;
 
 layout(std140) uniform uCameraData
 {
@@ -21,7 +23,9 @@ layout(std140) uniform uCameraData
 
 void main()
 {
-	vsMaterialIndex = inMaterialIndex;
+	vsMaterialIndex = inBindlessHandleMaterialIndex.z;
+	vsTexCoord = inTexCoord;
+	vsBindlessTextureHandle = inBindlessHandleMaterialIndex.xy;
 
 	vec4 worldPos = inTransform * vec4(inPosition, 1.0);
 	vsPosition = worldPos.xyz;

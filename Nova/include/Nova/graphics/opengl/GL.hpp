@@ -10,6 +10,41 @@ namespace Nova
 {
     // TODO Add implicit casts to GLenum for strong typed enumerations
 
+    enum class PixelFormat : GLenum
+    {
+        Red = GL_RED,
+        RG = GL_RG,
+        RGB = GL_RGB,
+        BRG = GL_BGR,
+        RGBA = GL_RGBA,
+        BGRA = GL_BGRA,
+        DepthComponent = GL_DEPTH_COMPONENT,
+        StencilIndex = GL_STENCIL_INDEX,
+    };
+
+    enum class PixelType : GLenum
+    {
+        UnsignedByte = GL_UNSIGNED_BYTE,
+        Byte = GL_BYTE,
+        UnsignedShort = GL_UNSIGNED_SHORT,
+        Short = GL_SHORT,
+        UnsignedInt = GL_UNSIGNED_INT,
+        Int = GL_INT,
+        Float = GL_FLOAT,
+        UnsignedByte332 = GL_UNSIGNED_BYTE_3_3_2,
+        UnsignedByte233Rev = GL_UNSIGNED_BYTE_2_3_3_REV,
+        UnsignedShort565 = GL_UNSIGNED_SHORT_5_6_5,
+        UnsignedShort565Rev = GL_UNSIGNED_SHORT_5_6_5_REV,
+        UnsignedShort4444 = GL_UNSIGNED_SHORT_4_4_4_4,
+        UnsignedShort4444Rev = GL_UNSIGNED_SHORT_4_4_4_4_REV,
+        UnsignedShort5551 = GL_UNSIGNED_SHORT_5_5_5_1,
+        UnsignedShort1555Rev = GL_UNSIGNED_SHORT_1_5_5_5_REV,
+        UnsignedInt8888 = GL_UNSIGNED_INT_8_8_8_8,
+        UnsignedInt8888Rev = GL_UNSIGNED_INT_8_8_8_8_REV,
+        UnsignedInt1010102 = GL_UNSIGNED_INT_10_10_10_2, 
+        UnsignedInt2101010Rev = GL_UNSIGNED_INT_2_10_10_10_REV,
+    };
+
     enum class DepthFunction : GLenum
     {
         /// @brief Never passes.
@@ -1006,6 +1041,41 @@ namespace Nova
         inline void DepthFunc(DepthFunction func) noexcept
         {
             glDepthFunc((GLenum)func);
+        }
+
+        /// @brief Specify a two-dimensional texture subimage.
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glTexSubImage2D.xhtml
+        /// @param texture Specifies the texture object name.
+        /// @param level Specifies the level-of-detail number. Level 0 is the base image level. Level n is the nth mipmap reduction image.
+        /// @param xoffset Specifies a texel offset in the x direction within the texture array.
+        /// @param yoffset Specifies a texel offset in the y direction within the texture array.
+        /// @param width Specifies the width of the texture subimage.
+        /// @param height Specifies the height of the texture subimage.
+        /// @param format Specifies the format of the pixel data.
+        /// @param type Specifies the data type of the pixel data.
+        /// @param pixels Specifies a pointer to the image data in memory.
+        inline void TextureSubImage2D(
+            GLuint texture,
+            GLint level,
+            GLint xoffset,
+            GLint yoffset,
+            GLsizei width,
+            GLsizei height,
+            PixelFormat format,
+            PixelType type,
+            const void *pixels) noexcept
+        {
+            glTextureSubImage2D(
+                texture,
+                level,
+                xoffset,
+                yoffset,
+                width,
+                height,
+                (GLenum)format,
+                (GLenum)type,
+                pixels);
         }
 	}
 

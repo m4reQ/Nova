@@ -1,4 +1,5 @@
 #version 450 core
+#extension GL_ARB_bindless_texture : require
 
 struct Material
 {
@@ -20,9 +21,10 @@ struct DirLight
 };
 
 in flat uint vsMaterialIndex;
+in flat uvec2 vsBindlessTextureHandle;
 in vec3 vsPosition;
 in vec3 vsNormal;
-// in vec2 vsTexCoord;
+in vec2 vsTexCoord;
 
 layout(location=3) out vec4 outColor;
 
@@ -56,8 +58,10 @@ layout(std430, binding = 3) readonly buffer sDirLightsBuffer
 void main()
 {
 	Material material = materialData[vsMaterialIndex];
-    vec3 baseColor = material.color.rgb;
-    float baseAlpha = material.color.a;
+
+    vec4 textureColor = texture(sampler2D(vsBindlessTextureHandle), vsTexCoord);
+    vec3 baseColor = textureColor.rgb * material.color.rgb;
+    float baseAlpha = textureColor.a * material.color.a;
 
     vec3 normal = normalize(vsNormal);
     
