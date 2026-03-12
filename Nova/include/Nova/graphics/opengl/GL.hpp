@@ -41,7 +41,7 @@ namespace Nova
         UnsignedShort1555Rev = GL_UNSIGNED_SHORT_1_5_5_5_REV,
         UnsignedInt8888 = GL_UNSIGNED_INT_8_8_8_8,
         UnsignedInt8888Rev = GL_UNSIGNED_INT_8_8_8_8_REV,
-        UnsignedInt1010102 = GL_UNSIGNED_INT_10_10_10_2, 
+        UnsignedInt1010102 = GL_UNSIGNED_INT_10_10_10_2,
         UnsignedInt2101010Rev = GL_UNSIGNED_INT_2_10_10_10_REV,
     };
 
@@ -137,9 +137,9 @@ namespace Nova
         /// @brief Shared access to buffers that are simultaneously mapped for client access and are used by the server will be coherent, so long as that mapping is performed using glMapBufferRange.
         /// That is, data written to the store by either the client or server will be immediately visible to the other with no further action taken by the application.
         /// In particular,
-        /// 
+        ///
         /// If GL_MAP_COHERENT_BIT is not set and the client performs a write followed by a call to the glMemoryBarrier command with the GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT set, then in subsequent commands the server will see the writes.
-        /// 
+        ///
         /// If GL_MAP_COHERENT_BIT is set and the client performs a write, then in subsequent commands the server will see the writes.
         ///
         /// If GL_MAP_COHERENT_BIT is not set and the server performs a write, the application must call glMemoryBarrier with the GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT set and then call glFenceSync with GL_SYNC_GPU_COMMANDS_COMPLETE (or glFinish). Then the CPU will see the writes after the sync is complete.
@@ -373,8 +373,8 @@ namespace Nova
         ShaderStorageBlock = GL_SHADER_STORAGE_BLOCK,
     };
 
-	enum class ProgramInterface2 : GLenum
-	{
+    enum class ProgramInterface2 : GLenum
+    {
         Uniform = GL_UNIFORM,
         UniformBlock = GL_UNIFORM_BLOCK,
         AtomicCounterBuffer = GL_ATOMIC_COUNTER_BUFFER,
@@ -396,7 +396,7 @@ namespace Nova
         BufferVariable = GL_BUFFER_VARIABLE,
         ShaderStorageBlock = GL_SHADER_STORAGE_BLOCK,
         TransformFeedbackBuffer = GL_TRANSFORM_FEEDBACK_BUFFER,
-	};
+    };
 
     enum class ProgramInterfacePName : GLenum
     {
@@ -445,7 +445,7 @@ namespace Nova
         AtomicCounterBuffer = GL_ATOMIC_COUNTER_BUFFER,
         TransformFeedbackBuffer = GL_TRANSFORM_FEEDBACK_BUFFER,
         UniformBuffer = GL_UNIFORM_BUFFER,
-        ShaderStorageBuffer =  GL_SHADER_STORAGE_BUFFER,
+        ShaderStorageBuffer = GL_SHADER_STORAGE_BUFFER,
     };
 
     enum class BufferBindTarget : GLenum
@@ -545,7 +545,7 @@ namespace Nova
         /// @brief If enabled, and if the polygon is rendered in GL_LINE mode, an offset is added to depth values of a polygon's fragments before the depth comparison is performed.
         /// See glPolygonOffset.
         PolygonOffsetLine = GL_POLYGON_OFFSET_LINE,
-        
+
         /// @brief If enabled, an offset is added to depth values of a polygon's fragments before the depth comparison is performed, if the polygon is rendered in GL_POINT mode.
         /// See glPolygonOffset.
         PolygonOffsetPoint = GL_POLYGON_OFFSET_POINT,
@@ -605,8 +605,8 @@ namespace Nova
         ProgramPointSize = GL_PROGRAM_POINT_SIZE,
     };
 
-	namespace GL
-	{
+    namespace GL
+    {
         /// <summary>
         /// Query a property of an interface in a program
         /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glGetProgramInterface.xhtml
@@ -655,7 +655,7 @@ namespace Nova
         /// @param offset Specifies the starting offset within the buffer of the range to be mapped.
         /// @param length Specifies the length of the range to be mapped.
         /// @param access Specifies a combination of access flags indicating the desired access to the mapped range.
-        inline void* MapNamedBufferRange(
+        inline void *MapNamedBufferRange(
             GLuint buffer,
             GLintptr offset,
             GLsizeiptr length,
@@ -715,7 +715,7 @@ namespace Nova
                 (GLenum)programInterface,
                 index,
                 (GLsizei)props.size(),
-                (const GLenum*)props.data(),
+                (const GLenum *)props.data(),
                 (GLsizei)params.size_bytes(),
                 nullptr,
                 params.data());
@@ -891,7 +891,7 @@ namespace Nova
         }
 
         /// @brief Specify clear values for the color buffers.
-        /// 
+        ///
         /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glClearColor.xhtml
         /// @param red Specify the red value used when the color buffers are cleared. The initial values is 0.
         /// @param green Specify the green value used when the color buffers are cleared. The initial values is 0.
@@ -903,10 +903,10 @@ namespace Nova
         }
 
         /// @brief Specify clear values for the color buffers.
-        /// 
+        ///
         /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glClearColor.xhtml
         /// @param color Specify the red, green, blue, and alpha values used when the color buffers are cleared. The initial values are all 0.
-        inline void ClearColor(const glm::vec4& color) noexcept
+        inline void ClearColor(const glm::vec4 &color) noexcept
         {
             glClearColor(color.r, color.g, color.b, color.a);
         }
@@ -930,7 +930,7 @@ namespace Nova
         }
 
         /// @brief Specify the clear value for the stencil buffer.
-        /// 
+        ///
         /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glClearStencil.xhtml
         /// @param stencil Specifies the index used when the stencil buffer is cleared. The initial value is 0.
         inline void ClearStencil(GLint stencil) noexcept
@@ -959,7 +959,7 @@ namespace Nova
         }
 
         /// @brief Bind a range within a buffer object to an indexed buffer target.
-        /// 
+        ///
         /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindBufferRange.xhtml
         /// @param target Specify the target of the bind operation.
         /// @param index Specify the index of the binding point within the array specified by target.
@@ -972,7 +972,7 @@ namespace Nova
         }
 
         /// @brief Bind a named buffer object.
-        /// 
+        ///
         /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindBuffer.xhtml
         /// @param target Specifies the target to which the buffer object is bound.
         /// @param buffer Specifies the name of a buffer object.
@@ -1019,7 +1019,7 @@ namespace Nova
         /// @param levels Specify the number of texture levels.
         /// @param internalformat Specifies the sized internal format to be used to store texture image data.
         /// @param width Specifies the width of the texture, in texels.
-        /// @param height Specifies the height of the texture, in texels. 
+        /// @param height Specifies the height of the texture, in texels.
         inline void TextureStorage2D(GLuint texture, GLsizei levels, InternalFormat internalformat, GLsizei width, GLsizei height)
         {
             glTextureStorage2D(texture, levels, (GLenum)internalformat, width, height);
@@ -1077,7 +1077,14 @@ namespace Nova
                 (GLenum)type,
                 pixels);
         }
-	}
+
+        /// @brief Generate mipmaps for a specified texture object.
+        /// @param texture Specifies the texture object name.
+        inline void GenerateTextureMipmap(GLuint texture)
+        {
+            glGenerateTextureMipmap(texture);
+        }
+    }
 
     template <std::integral T>
     constexpr Attachment operator+(Attachment a, T b) noexcept
