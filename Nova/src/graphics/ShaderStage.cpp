@@ -26,7 +26,7 @@ static void CheckShaderStatus(GLuint id)
 
 static void SpecializeShaderStage(
 	GLuint stageID,
-	const ShaderSpecializeInfo& info)
+	const ShaderSpecializeInfo &info)
 {
 	NV_PROFILE_FUNC;
 
@@ -36,7 +36,7 @@ static void SpecializeShaderStage(
 	std::vector<GLuint> constantValues;
 	constantValues.reserve(info.SpecializeConstants.size());
 
-	for (const auto& [index, value] : info.SpecializeConstants)
+	for (const auto &[index, value] : info.SpecializeConstants)
 	{
 		constantIndices.emplace_back(index);
 		constantValues.emplace_back(value);
@@ -63,7 +63,7 @@ ShaderStage ShaderStage::FromGLSL(
 
 	const auto data = source.data();
 	const auto length = source.size();
-	glShaderSource(id, 1, &data, (GLint*)&length);
+	glShaderSource(id, 1, &data, (GLint *)&length);
 	glCompileShader(id);
 
 	CheckShaderStatus(id);
@@ -73,11 +73,11 @@ ShaderStage ShaderStage::FromGLSL(
 
 ShaderStage ShaderStage::FromGLSL(
 	ShaderType type,
-	const std::filesystem::path& filepath)
+	const std::filesystem::path &filepath)
 {
 	NV_PROFILE_FUNC;
 
-	const auto [source, size] = File::ReadText(filepath);
+	const auto [source, size] = File::ReadWholeText(filepath);
 	return FromGLSL(type, std::string_view(source.get(), size));
 }
 
@@ -96,7 +96,7 @@ ShaderStage ShaderStage::FromBinary(
 ShaderStage ShaderStage::FromBinary(
 	ShaderType type,
 	GLenum binaryType,
-	const uint8_t* binary,
+	const uint8_t *binary,
 	size_t binarySize)
 {
 	NV_PROFILE_FUNC;
@@ -120,11 +120,11 @@ ShaderStage ShaderStage::FromBinary(
 ShaderStage ShaderStage::FromBinary(
 	ShaderType type,
 	GLenum binaryType,
-	const std::filesystem::path& filepath)
+	const std::filesystem::path &filepath)
 {
 	NV_PROFILE_FUNC;
 
-	const auto [binary, size] = File::ReadBinary(filepath);
+	const auto [binary, size] = File::ReadWholeBinary(filepath);
 	return FromBinary(
 		type,
 		binaryType,
@@ -142,7 +142,7 @@ ShaderStage ShaderStage::FromSPIRV(
 ShaderStage ShaderStage::FromSPIRV(
 	ShaderType type,
 	const std::span<uint8_t> binary,
-	const ShaderSpecializeInfo& specializeInfo)
+	const ShaderSpecializeInfo &specializeInfo)
 {
 	NV_PROFILE_FUNC;
 
@@ -154,7 +154,7 @@ ShaderStage ShaderStage::FromSPIRV(
 
 ShaderStage ShaderStage::FromSPIRV(
 	ShaderType type,
-	const std::uint8_t* binary,
+	const std::uint8_t *binary,
 	size_t binarySize)
 {
 	NV_PROFILE_FUNC;
@@ -164,9 +164,9 @@ ShaderStage ShaderStage::FromSPIRV(
 
 ShaderStage ShaderStage::FromSPIRV(
 	ShaderType type,
-	const std::uint8_t* binary,
+	const std::uint8_t *binary,
 	size_t binarySize,
-	const ShaderSpecializeInfo& specializeInfo)
+	const ShaderSpecializeInfo &specializeInfo)
 {
 	NV_PROFILE_FUNC;
 
@@ -178,18 +178,18 @@ ShaderStage ShaderStage::FromSPIRV(
 
 ShaderStage ShaderStage::FromSPIRV(
 	ShaderType type,
-	const std::filesystem::path& filepath)
+	const std::filesystem::path &filepath)
 {
 	NV_PROFILE_FUNC;
 
-	const auto [binary, size] = File::ReadBinary(filepath);
+	const auto [binary, size] = File::ReadWholeBinary(filepath);
 	return FromSPIRV(type, binary.get(), size);
 }
 
 ShaderStage ShaderStage::FromSPIRV(
 	ShaderType type,
-	const std::filesystem::path& filepath,
-	const ShaderSpecializeInfo& specializeInfo)
+	const std::filesystem::path &filepath,
+	const ShaderSpecializeInfo &specializeInfo)
 {
 	NV_PROFILE_FUNC;
 

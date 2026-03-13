@@ -38,6 +38,8 @@ layout(std140) uniform uCameraData
 	mat4 cameraView;
 	mat4 cameraProjection;
 	vec3 cameraPosition;
+    float zNear;
+    float zFar;
 };
 
 layout(std430, binding = 1) readonly buffer sMaterialData

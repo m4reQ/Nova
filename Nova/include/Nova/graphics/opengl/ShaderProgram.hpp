@@ -33,12 +33,12 @@ namespace Nova
 
 		static ShaderProgram FromBinary(
 			GLenum binaryFormat,
-			const uint8_t* binary,
+			const uint8_t *binary,
 			size_t binarySize);
 
 		static ShaderProgram FromBinary(
 			GLenum binaryFormat,
-			const std::filesystem::path& filepath);
+			const std::filesystem::path &filepath);
 
 		static bool IsShaderBinarySupported() noexcept;
 
@@ -46,25 +46,25 @@ namespace Nova
 
 		ShaderProgram() = default;
 
-		ShaderProgram(const ShaderProgram&) = delete;
+		ShaderProgram(const ShaderProgram &) = delete;
 
-		ShaderProgram(ShaderProgram&& other) noexcept
+		ShaderProgram(ShaderProgram &&other) noexcept
 			: resources_(std::move(other.resources_)),
 			  savedBinary_(std::move(other.savedBinary_)),
-			  id_(other.id_) { }
+			  id_(other.id_) {}
 
-		ShaderProgram(const ShaderStage* stages, size_t stagesCount);
+		ShaderProgram(const ShaderStage *stages, size_t stagesCount);
 
 		template <HasArrayInterface<ShaderStage> T>
-		ShaderProgram(const T& stages)
-			: ShaderProgram(stages.data(), stages.size()) { }
+		ShaderProgram(const T &stages)
+			: ShaderProgram(stages.data(), stages.size()) {}
 
 		template <HasConstArrayInterface<ShaderStage> T>
-		ShaderProgram(const T& stages)
-			: ShaderProgram(stages.data(), stages.size()) { }
+		ShaderProgram(const T &stages)
+			: ShaderProgram(stages.data(), stages.size()) {}
 
 		ShaderProgram(std::initializer_list<ShaderStage> stages)
-			: ShaderProgram(std::span(stages)) { }
+			: ShaderProgram(std::span(stages)) {}
 
 		void Use() const;
 
@@ -76,7 +76,11 @@ namespace Nova
 
 		void SetUniform(const std::string_view name, uint32_t value) const;
 
-		void SetUniform(const std::string_view name, const glm::vec3& value) const;
+		void SetUniform(const std::string_view name, const glm::vec4 &value) const;
+
+		void SetUniform(const std::string_view name, const glm::vec3 &value) const;
+
+		void SetUniform(const std::string_view name, const glm::vec2 &value) const;
 
 		GLuint GetResourceLocation(const std::string_view name) const;
 
@@ -84,7 +88,7 @@ namespace Nova
 
 		std::pair<const std::span<std::byte>, GLenum> GetBinary();
 
-		ShaderProgram& operator=(ShaderProgram&& other) noexcept
+		ShaderProgram &operator=(ShaderProgram &&other) noexcept
 		{
 			resources_ = std::move(other.resources_);
 			savedBinary_ = std::move(other.savedBinary_);
@@ -98,7 +102,8 @@ namespace Nova
 			std::string,
 			GLuint,
 			StringHash,
-			std::equal_to<>> resources_;
+			std::equal_to<>>
+			resources_;
 		std::optional<ProgramBinary> savedBinary_ = std::nullopt;
 		GLuint id_;
 	};

@@ -16,6 +16,7 @@ target_link_libraries(
     stb
     dotnet
     xxHash
+    uuid_v4
     nlohmann_json)
 target_compile_definitions(
     Nova

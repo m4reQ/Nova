@@ -1,11 +1,12 @@
 #pragma once
 #include <Nova/graphics/opengl/GL.hpp>
+#include <Nova/graphics/opengl/FramebufferAttachment.hpp>
 #include <glm/vec2.hpp>
 #include <utility>
 
 namespace Nova
 {
-    class Renderbuffer
+    class Renderbuffer : public IFramebufferAttachment
     {
     public:
         Renderbuffer() = default;
@@ -26,15 +27,15 @@ namespace Nova
 
         void Resize(GLsizei width, GLsizei height, InternalFormat format) noexcept;
 
-        constexpr GLsizei GetWidth() const noexcept { return width_; }
+        constexpr GLsizei GetWidth() const noexcept override { return width_; }
 
-        constexpr GLsizei GetHeight() const noexcept { return width_; }
+        constexpr GLsizei GetHeight() const noexcept override { return width_; }
 
         constexpr glm::ivec2 GetSize() const noexcept { return {width_, height_}; }
 
-        constexpr InternalFormat GetFormat() const noexcept { return format_; }
+        constexpr InternalFormat GetFormat() const noexcept override { return format_; }
 
-        constexpr GLuint GetID() const noexcept { return id_; }
+        constexpr GLuint GetID() const noexcept override { return id_; }
 
         constexpr Renderbuffer &operator=(Renderbuffer &&other) noexcept
         {

@@ -10,38 +10,38 @@ static constexpr const std::string_view AttribTypeToString(AttributeType type)
 {
 	switch (type)
 	{
-		case AttributeType::Byte:
-			return "Byte";
-		case AttributeType::UnsignedByte:
-			return "UnsignedByte";
-		case AttributeType::Short:
-			return "Short";
-		case AttributeType::UnsignedShort:
-			return "UnsignedShort";
-		case AttributeType::Int:
-			return "Int";
-		case AttributeType::UnsignedInt:
-			return "UnsignedInt";
-		case AttributeType::Fixed:
-			return "Fixed";
-		case AttributeType::Float:
-			return "Float";
-		case AttributeType::HalfFloat:
-			return "HalfFloat";
-		case AttributeType::Double:
-			return "Double";
-		case AttributeType::Int2101010Rev:
-			return "Int2101010Rev";
-		case AttributeType::UnsignedInt2101010Rev:
-			return "UnsignedInt2101010Rev";
-		case AttributeType::UnsignedInt10F11F11FRev:
-			return "UnsignedInt10F11F11FRev";
+	case AttributeType::Byte:
+		return "Byte";
+	case AttributeType::UnsignedByte:
+		return "UnsignedByte";
+	case AttributeType::Short:
+		return "Short";
+	case AttributeType::UnsignedShort:
+		return "UnsignedShort";
+	case AttributeType::Int:
+		return "Int";
+	case AttributeType::UnsignedInt:
+		return "UnsignedInt";
+	case AttributeType::Fixed:
+		return "Fixed";
+	case AttributeType::Float:
+		return "Float";
+	case AttributeType::HalfFloat:
+		return "HalfFloat";
+	case AttributeType::Double:
+		return "Double";
+	case AttributeType::Int2101010Rev:
+		return "Int2101010Rev";
+	case AttributeType::UnsignedInt2101010Rev:
+		return "UnsignedInt2101010Rev";
+	case AttributeType::UnsignedInt10F11F11FRev:
+		return "UnsignedInt10F11F11FRev";
 	}
 
 	NV_UNREACHABLE;
 }
 
-VertexArray::VertexArray(VertexArray&& other) noexcept
+VertexArray::VertexArray(VertexArray &&other) noexcept
 	: GLObject::GLObject(std::exchange(other.m_ID, 0))
 {
 	RegisterObject(GL_VERTEX_ARRAY, m_ID);
@@ -60,27 +60,27 @@ VertexArray::VertexArray(std::span<const VertexInput> layout)
 
 	for (const auto &vertexInput : layout)
 		AddVertexInput(vertexInput);
-	
+
 	RegisterObject(GL_VERTEX_ARRAY, m_ID);
 }
 
 VertexArray::VertexArray(
 	std::span<const VertexInput> layout,
-	const Buffer& elementBuffer)
+	const Buffer &elementBuffer)
 	: VertexArray(layout)
 {
 	GL::VertexArrayElementBuffer(m_ID, (GLuint)elementBuffer.GetID());
 }
 
 VertexArray::VertexArray(std::initializer_list<VertexInput> layout)
-	: VertexArray(std::span<const VertexInput>(layout.begin(), layout.end())) { }
+	: VertexArray(std::span<const VertexInput>(layout.begin(), layout.end())) {}
 
 VertexArray::VertexArray(
 	std::initializer_list<VertexInput> layout,
-	const Buffer& elementBuffer)
-	: VertexArray(std::span<const VertexInput>(layout.begin(), layout.end()), elementBuffer) {  }
+	const Buffer &elementBuffer)
+	: VertexArray(std::span<const VertexInput>(layout.begin(), layout.end()), elementBuffer) {}
 
-void VertexArray::AddVertexInput(const VertexInput& vertexInput)
+void VertexArray::AddVertexInput(const VertexInput &vertexInput)
 {
 	AddVertexInput(
 		vertexInput.Stride,
@@ -92,7 +92,7 @@ void VertexArray::AddVertexInput(const VertexInput& vertexInput)
 
 void VertexArray::AddVertexInput(
 	GLuint stride,
-	const std::vector<VertexDescriptor>& descriptors,
+	const std::vector<VertexDescriptor> &descriptors,
 	BufferID bufferID,
 	GLint offset,
 	GLint instanceDivisor)
@@ -100,7 +100,7 @@ void VertexArray::AddVertexInput(
 	NV_PROFILE_FUNC;
 
 	GLuint bindingIndex;
-	const auto& bindingEntry = m_BufferBindings.find((GLuint)bufferID);
+	const auto &bindingEntry = m_BufferBindings.find((GLuint)bufferID);
 	if (bindingEntry == m_BufferBindings.end())
 	{
 		NV_LOG_WARNING("Vertex array {} is using automatic buffer binding resolution for buffer {}. To speed this up consider selecting buffer binding before using BindVertexBuffer or manually specify the binding.", (GLuint)m_ID, (GLuint)bufferID);
@@ -128,7 +128,7 @@ void VertexArray::AddVertexInput(
 	NV_LOG_TRACE("VertexArray({}) Bound vertex buffer {} at index {}.", (GLuint)m_ID, (GLuint)bufferID, bindingIndex);
 
 	GLuint attribOffset = 0;
-	for (const auto& descriptor : descriptors)
+	for (const auto &descriptor : descriptors)
 	{
 		NV_PROFILE_SCOPE("::AddVertexDescriptor");
 
@@ -196,7 +196,7 @@ void VertexArray::Use() const noexcept
 
 void VertexArray::BindVertexBuffer(const Buffer &buffer, GLuint bindingIndex, GLsizei stride, GLintptr offset)
 {
-	const auto& bindingEntry = m_BufferBindings.find((GLuint)buffer.GetID());
+	const auto &bindingEntry = m_BufferBindings.find((GLuint)buffer.GetID());
 	if (bindingEntry != m_BufferBindings.end())
 	{
 		m_UsedBufferBindings.erase(
@@ -207,7 +207,7 @@ void VertexArray::BindVertexBuffer(const Buffer &buffer, GLuint bindingIndex, GL
 
 		// NV_LOG_WARNING("Buffer with ID {} is already bound to binding index {}. Buffer will be rebound.", (GLuint)buffer.GetID(), bindingEntry->second);
 	}
-	
+
 	m_BufferBindings[(GLuint)buffer.GetID()] = bindingIndex;
 	m_UsedBufferBindings.emplace_back(bindingIndex);
 	GL::VertexArrayVertexBuffer(m_ID, bindingIndex, (GLuint)buffer.GetID(), offset, stride);
@@ -230,7 +230,7 @@ void VertexArray::Delete() noexcept
 	m_ID = 0;
 }
 
-VertexArray& VertexArray::operator=(VertexArray&& other) noexcept
+VertexArray &VertexArray::operator=(VertexArray &&other) noexcept
 {
 	m_ID = std::exchange(other.m_ID, 0);
 	return *this;
@@ -244,9 +244,9 @@ GLuint VertexArray::FindNextFreeBindingIndex()
 	for (GLuint i = 0; i < maxBindingsCount; i++)
 	{
 		const auto bindingUnused = std::find(
-			m_UsedBufferBindings.begin(),
-			m_UsedBufferBindings.end(),
-			i) == m_UsedBufferBindings.end();
+									   m_UsedBufferBindings.begin(),
+									   m_UsedBufferBindings.end(),
+									   i) == m_UsedBufferBindings.end();
 		if (bindingUnused)
 			return i;
 	}

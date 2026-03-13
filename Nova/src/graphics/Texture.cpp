@@ -4,7 +4,7 @@
 
 using namespace Nova;
 
-static void CreateTextureStorage(TextureTarget target, GLuint texture, const TextureSpec& spec) noexcept
+static void CreateTextureStorage(TextureTarget target, GLuint texture, const TextureSpec &spec) noexcept
 {
     NV_PROFILE_FUNC;
 
@@ -22,7 +22,7 @@ static void CreateTextureStorage(TextureTarget target, GLuint texture, const Tex
     }
 }
 
-Texture::Texture(TextureTarget target, const TextureSpec& spec)
+Texture::Texture(TextureTarget target, const TextureSpec &spec)
     : target_(target), spec_(spec)
 {
     NV_PROFILE_FUNC;
@@ -33,10 +33,10 @@ Texture::Texture(TextureTarget target, const TextureSpec& spec)
     GL::TextureParameter(id_, TextureParameterName::TextureWrapR, (GLint)spec.Wrapping.R);
     GL::TextureParameter(id_, TextureParameterName::TextureWrapS, (GLint)spec.Wrapping.S);
     GL::TextureParameter(id_, TextureParameterName::TextureWrapT, (GLint)spec.Wrapping.T);
-    
-    constexpr GLfloat borderColor[4] {1.0f, 1.0f, 1.0f, 1.0f};
+
+    constexpr GLfloat borderColor[4]{1.0f, 1.0f, 1.0f, 1.0f};
     glTextureParameterfv(id_, GL_TEXTURE_BORDER_COLOR, borderColor);
-    
+
     CreateTextureStorage(target, id_, spec);
 
     GLint isImmutable = GL_FALSE;
@@ -59,21 +59,26 @@ Texture::~Texture() noexcept
 
 void Texture::Bind(GLuint unit) const noexcept
 {
+    NV_PROFILE_FUNC;
     glBindTextureUnit(unit, id_);
 }
 
 void Texture::MakeResident() const noexcept
 {
+    NV_PROFILE_FUNC;
     glMakeTextureHandleResidentARB(bindlessHandle_);
 }
 
 void Texture::MakeNonResident() const noexcept
 {
+    NV_PROFILE_FUNC;
     glMakeTextureHandleNonResidentARB(bindlessHandle_);
 }
 
-void Texture::Upload(const TextureUploadInfo& info, const void* data) const noexcept
+void Texture::Upload(const TextureUploadInfo &info, const void *data) const noexcept
 {
+    NV_PROFILE_FUNC;
+
     GL::TextureSubImage2D(
         id_,
         info.Mipmap,
@@ -84,10 +89,13 @@ void Texture::Upload(const TextureUploadInfo& info, const void* data) const noex
         info.PixelFormat,
         info.PixelType,
         data);
-    glGenerateTextureMipmap(id_);
+
+    {
+        NV_PROFILE_SCOPE("::GenerateTextureMipmap");
+        GL::GenerateTextureMipmap(id_);
+    }
 }
 
 void Texture::UploadFromPBO() const noexcept
 {
-
 }

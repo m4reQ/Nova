@@ -12,6 +12,7 @@
 #include <Nova/debug/Log.hpp>
 #include <Nova/core/Utility.hpp>
 #include <xxhash.h>
+#include <glad/gl.h>
 #include <unordered_map>
 #include <stdexcept>
 #include <iostream>
@@ -43,7 +44,9 @@ struct DirLightData
 
 struct InstanceData
 {
-	glm::uvec3 BindlessHandleMaterialIndex;
+	GLuint MaterialIndex;
+	GLuint BindlessHangleHigh;
+	GLuint BindlessHandleLow;
 	glm::mat4 Transform;
 	glm::mat3 NormalTransform;
 };
@@ -53,7 +56,8 @@ struct CameraData
 	glm::mat4 ViewMatrix;
 	glm::mat4 ProjectionMatrix;
 	glm::vec3 Position;
-	float _Padding[1];
+	float ZNear;
+	float ZFar;
 };
 
 struct MaterialData
@@ -79,7 +83,7 @@ constexpr GLsizei c_ShadowMapWidth = 1024;
 constexpr GLsizei c_ShadowMapHeight = 1024;
 constexpr GLsizei c_MaxShadowCasters = 8;
 
-static std::unordered_map<const Model*, DrawData> s_DrawData;
+static std::unordered_map<const Model *, DrawData> s_DrawData;
 
 static RendererInfo s_RendererInfo;
 
@@ -90,11 +94,11 @@ static std::unordered_map<Material, GLuint, XXHasher<Material>> s_Materials;
 // lights
 static PersistentMappedBuffer s_LightsBuffer;
 
-static PointLightData* s_PointLights;
+static PointLightData *s_PointLights;
 static GLuint s_PointLightsCount;
 static GLuint s_MaxPointLightsCount;
 
-static DirLightData* s_DirLights;
+static DirLightData *s_DirLights;
 static GLuint s_DirLightsCount;
 static GLuint s_MaxDirLightsCount;
 
@@ -104,10 +108,11 @@ static PersistentMappedBuffer s_InstanceBuffer;
 static ShaderProgram s_DeferredGeometryProgram;
 static ShaderProgram s_DeferredLightProgram;
 static ShaderProgram s_DeferredTransparentProgram;
+static ShaderProgram s_DeferredFogProgram;
 static VertexArray s_VertexArray;
 static Texture s_WhiteTexture;
 static Framebuffer s_Framebuffer;
-static Sync s_FrameSync; // guards materials buffer, lights buffer and camera data buffer
+static Sync s_FrameSync;		// guards materials buffer, lights buffer and camera data buffer
 static Sync s_InstanceDataSync; // guards instance data buffer between each batch draw
 static GLsizei s_CurrentDisplayWidth;
 static GLsizei s_CurrentDisplayHeight;
@@ -121,7 +126,7 @@ static void ExecuteShadowMapPass() noexcept
 	glViewport(0, 0, c_ShadowMapWidth, c_ShadowMapHeight);
 }
 
-static GLuint GetMaterialIndex(const Material& material)
+static GLuint GetMaterialIndex(const Material &material)
 {
 	NV_PROFILE_FUNC;
 
@@ -197,116 +202,130 @@ static ShaderProgram CreateDeferredTransparentShaderProgram()
 	});
 }
 
-static void RetrieveRendererInfo() noexcept
+static ShaderProgram CreateDeferredFogProgram()
 {
-	s_RendererInfo.VendorName = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
-	s_RendererInfo.RendererName = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
-	s_RendererInfo.Version = reinterpret_cast<const char*>(glGetString(GL_VERSION));
-	s_RendererInfo.GLSLVersion = reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION));
+	return ShaderProgram({
+		ShaderStage::FromGLSL(
+			ShaderType::Vertex,
+			std::filesystem::path("./assets/shaders/deferredFog.vert")),
+		ShaderStage::FromGLSL(
+			ShaderType::Fragment,
+			std::filesystem::path("./assets/shaders/deferredFog.frag")),
+	});
 }
 
-static glm::mat3 BuildNormalTransformMatrix(const glm::mat4& transform) noexcept
+static void RetrieveRendererInfo() noexcept
+{
+	s_RendererInfo.VendorName = reinterpret_cast<const char *>(glGetString(GL_VENDOR));
+	s_RendererInfo.RendererName = reinterpret_cast<const char *>(glGetString(GL_RENDERER));
+	s_RendererInfo.Version = reinterpret_cast<const char *>(glGetString(GL_VERSION));
+	s_RendererInfo.GLSLVersion = reinterpret_cast<const char *>(glGetString(GL_SHADING_LANGUAGE_VERSION));
+}
+
+static glm::mat3 BuildNormalTransformMatrix(const glm::mat4 &transform) noexcept
 {
 	NV_PROFILE_FUNC;
 	return glm::transpose(glm::inverse(glm::mat3(transform)));
 }
 
-static std::vector<InstanceData>& GetModelInstanceDataStore(const Model* model, bool useTransparency)
+static std::vector<InstanceData> &GetModelInstanceDataStore(const Model *model, bool useTransparency)
 {
 	NV_PROFILE_FUNC;
-	
-	const auto& it = s_DrawData.find(model);
+
+	const auto &it = s_DrawData.find(model);
 	if (it != s_DrawData.end())
 		return useTransparency
-			? it->second.TransparentInstanceData
-			: it->second.OpaqueInstanceData;
-	
-	const auto& [data, _] = s_DrawData.emplace(model, DrawData { .Age = 0 });
+				   ? it->second.TransparentInstanceData
+				   : it->second.OpaqueInstanceData;
+
+	const auto &[data, _] = s_DrawData.emplace(model, DrawData{.Age = 0});
 	return useTransparency
-		? data->second.TransparentInstanceData
-		: data->second.OpaqueInstanceData;
+			   ? data->second.TransparentInstanceData
+			   : data->second.OpaqueInstanceData;
 }
 
 void Renderer::Render(
-	const Model* model,
-	const Material& material,
-	const glm::mat4& transform)
+	const Model *model,
+	const Material &material,
+	const glm::mat4 &transform)
 {
 	NV_PROFILE_FUNC;
 
 	const auto bindlessHandle = s_WhiteTexture.GetBindlessHandle();
 
-	auto& instanceDataStore = GetModelInstanceDataStore(model, !glm::epsilonEqual(material.Color.a, 1.0f, glm::epsilon<float>()));
+	auto &instanceDataStore = GetModelInstanceDataStore(model, !glm::epsilonEqual(material.Color.a, 1.0f, glm::epsilon<float>()));
 	instanceDataStore.emplace_back(
-		InstanceData {
-			.BindlessHandleMaterialIndex = {
-				(uint32_t)(bindlessHandle & 0xffffffffui32),
-				(uint32_t)(bindlessHandle >> 32ui32),
-				GetMaterialIndex(material),
-			},
+		InstanceData{
+			.MaterialIndex = GetMaterialIndex(material),
+			.BindlessHangleHigh = (uint32_t)(bindlessHandle & 0xffffffffui32),
+			.BindlessHandleLow = (uint32_t)(bindlessHandle >> 32ui32),
 			.Transform = transform,
 			.NormalTransform = BuildNormalTransformMatrix(transform),
 		});
 }
 
 void Renderer::SetCamera(
-	const glm::mat4& view,
-	const glm::mat4& projection,
-	const glm::vec3& position)
+	const glm::mat4 &view,
+	const glm::mat4 &projection,
+	const glm::vec3 &position,
+	float zNear,
+	float zFar)
 {
-    NV_PROFILE_FUNC;
+	NV_PROFILE_FUNC;
 
 	auto cameraData = s_CameraDataBuffer.GetDataPtr<CameraData>();
 	cameraData->ViewMatrix = view;
 	cameraData->ProjectionMatrix = projection;
 	cameraData->Position = position;
+	cameraData->ZNear = zNear;
+	cameraData->ZFar = zFar;
 
 	s_CameraPosition = position;
 }
 
-const RendererInfo& Renderer::GetInfo() noexcept
+const RendererInfo &Renderer::GetInfo() noexcept
 {
 	return s_RendererInfo;
 }
 
-void Renderer::SetViewport(const Rect<int>& viewport) noexcept
+void Renderer::SetViewport(const Rect<int> &viewport) noexcept
 {
-    NV_PROFILE_FUNC;
-	
+	NV_PROFILE_FUNC;
+
 	glViewport(viewport.X, viewport.Y, viewport.Width, viewport.Height);
 }
 
 void Renderer::SetViewport(
-	const Rect<int>& viewport,
-	const Rect<int>& scissor) noexcept
+	const Rect<int> &viewport,
+	const Rect<int> &scissor) noexcept
 {
-    NV_PROFILE_FUNC;
-	
+	NV_PROFILE_FUNC;
+
 	glViewport(viewport.X, viewport.Y, viewport.Width, viewport.Height);
 	glScissor(scissor.X, scissor.Y, scissor.Width, scissor.Height);
 }
 
-void Renderer::AddPointLight(const glm::vec4& color, const glm::vec3& position, float radius)
+void Renderer::AddPointLight(const glm::vec4 &color, const glm::vec3 &position, float radius)
 {
 	NV_PROFILE_FUNC;
 
 	if (s_PointLightsCount >= s_MaxPointLightsCount)
 		return;
 
-	auto& data = s_PointLights[s_PointLightsCount++];
+	auto &data = s_PointLights[s_PointLightsCount++];
 	data.Color = color;
 	data.Position = position;
 	data.Radius = radius;
 }
 
-void Renderer::AddDirectionalLight(const glm::vec4& color, const glm::vec3& direction)
+void Renderer::AddDirectionalLight(const glm::vec4 &color, const glm::vec3 &direction)
 {
 	NV_PROFILE_FUNC;
 
 	if (s_DirLightsCount >= s_MaxDirLightsCount)
 		return;
 
-	auto& data = s_DirLights[s_DirLightsCount++];
+	auto &data = s_DirLights[s_DirLightsCount++];
 	data.Color = color;
 	data.Direction = direction;
 }
@@ -316,7 +335,7 @@ void Renderer::SetClearColor(float r, float g, float b, float a) noexcept
 	GL::ClearColor(r, g, b, a);
 }
 
-void Renderer::SetClearColor(const glm::vec4& color) noexcept
+void Renderer::SetClearColor(const glm::vec4 &color) noexcept
 {
 	GL::ClearColor(color);
 }
@@ -333,7 +352,7 @@ void Renderer::SetPolygonMode(PolygonMode mode) noexcept
 	glPolygonMode(GL_FRONT_AND_BACK, (GLenum)mode);
 }
 
-static void DrawBatch(const Model* model, const std::span<InstanceData> instanceData) noexcept
+static void DrawBatch(const Model *model, const std::span<InstanceData> instanceData) noexcept
 {
 	NV_PROFILE_FUNC;
 
@@ -346,7 +365,7 @@ static void DrawBatch(const Model* model, const std::span<InstanceData> instance
 		s_VertexArray.BindElementBuffer(model->GetIndexBuffer().value());
 
 	s_InstanceDataSync.WaitClient(SyncTimeoutInfinite);
-	
+
 	s_InstanceBuffer.Write(instanceData);
 	s_InstanceBuffer.Commit();
 
@@ -363,7 +382,7 @@ static void DrawBatch(const Model* model, const std::span<InstanceData> instance
 			0,
 			model->GetModelDataSize() / sizeof(ModelVertex),
 			instanceData.size());
-	
+
 	s_InstanceDataSync.Set();
 }
 
@@ -374,7 +393,7 @@ static void SortTransparentObjects(std::span<InstanceData> instanceData) noexcep
 	std::sort(
 		instanceData.begin(),
 		instanceData.end(),
-		[](const InstanceData& a, const InstanceData& b)
+		[](const InstanceData &a, const InstanceData &b)
 		{
 			const auto aDistance = glm::distance(glm::vec3(a.Transform[3]), s_CameraPosition);
 			const auto bDistance = glm::distance(glm::vec3(b.Transform[3]), s_CameraPosition);
@@ -389,7 +408,7 @@ static void ExecuteGeometryPass() noexcept
 	s_MaterialsBuffer.Bind(
 		BufferBaseTarget::ShaderStorageBuffer,
 		s_DeferredGeometryProgram.GetResourceLocation("sMaterialData"));
-	
+
 	s_CameraDataBuffer.Bind(
 		BufferBaseTarget::UniformBuffer,
 		s_DeferredGeometryProgram.GetResourceLocation("uCameraData"));
@@ -402,7 +421,7 @@ static void ExecuteGeometryPass() noexcept
 	GL::Enable(EnableCap::DepthTest);
 	GL::DepthFunc(DepthFunction::Less);
 
-	for (auto& [model, drawData] : s_DrawData)
+	for (auto &[model, drawData] : s_DrawData)
 	{
 		DrawBatch(model, drawData.OpaqueInstanceData);
 		drawData.OpaqueInstanceData.clear();
@@ -418,7 +437,7 @@ static void ExecuteLightingPass() noexcept
 	s_DeferredLightProgram.SetUniform("uPointLightsCount", s_PointLightsCount);
 	s_DeferredLightProgram.SetUniform("uDirLightsCount", s_DirLightsCount);
 	s_DeferredLightProgram.Use();
-	
+
 	s_LightsBuffer.Bind(
 		BufferBaseTarget::ShaderStorageBuffer,
 		s_DeferredLightProgram.GetResourceLocation("sPointLightsBuffer"),
@@ -429,12 +448,12 @@ static void ExecuteLightingPass() noexcept
 		s_DeferredLightProgram.GetResourceLocation("sDirLightsBuffer"),
 		sizeof(PointLightData) * s_MaxPointLightsCount,
 		sizeof(DirLightData) * s_MaxDirLightsCount);
-	
+
 	s_CameraDataBuffer.Bind(
 		BufferBaseTarget::UniformBuffer,
 		s_DeferredLightProgram.GetResourceLocation("uCameraData"));
 
-	const std::array<GLuint, 3> gBufferTextureIDs {
+	const std::array<GLuint, 3> gBufferTextureIDs{
 		s_Framebuffer.GetAttachment(0).AttachmentID,
 		s_Framebuffer.GetAttachment(1).AttachmentID,
 		s_Framebuffer.GetAttachment(2).AttachmentID,
@@ -460,15 +479,20 @@ static void ExecuteTransparentPass() noexcept
 
 	s_VertexArray.Use();
 
+	s_MaterialsBuffer.Bind(
+		BufferBaseTarget::ShaderStorageBuffer,
+		s_DeferredTransparentProgram.GetResourceLocation("sMaterialData"));
+
 	s_CameraDataBuffer.Bind(
 		BufferBaseTarget::UniformBuffer,
 		s_DeferredTransparentProgram.GetResourceLocation("uCameraData"));
-	
+
 	s_LightsBuffer.Bind(
 		BufferBaseTarget::ShaderStorageBuffer,
 		s_DeferredTransparentProgram.GetResourceLocation("sPointLightsBuffer"),
 		0,
 		sizeof(PointLightData) * s_MaxPointLightsCount);
+
 	s_LightsBuffer.Bind(
 		BufferBaseTarget::ShaderStorageBuffer,
 		s_DeferredTransparentProgram.GetResourceLocation("sDirLightsBuffer"),
@@ -482,29 +506,51 @@ static void ExecuteTransparentPass() noexcept
 	GL::Enable(EnableCap::Blend);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	for (auto& [model, drawData] : s_DrawData)
+	for (auto &[model, drawData] : s_DrawData)
 	{
 		SortTransparentObjects(drawData.TransparentInstanceData);
 		DrawBatch(model, drawData.TransparentInstanceData);
-
 		drawData.TransparentInstanceData.clear();
 	}
 }
 
-void Renderer::Draw(const glm::vec4& clearColor)
+static void ExecuteFogPass(const glm::vec4 &fogColor) noexcept
+{
+	NV_PROFILE_FUNC;
+
+	s_DeferredFogProgram.Use();
+	s_DeferredFogProgram.SetUniform("uFogColor", fogColor);
+
+	const std::array<GLuint, 2> textureIDs{
+		s_Framebuffer.GetAttachment(3).AttachmentID,
+		s_Framebuffer.GetAttachment(5).AttachmentID,
+	};
+	glBindTextures(0, textureIDs.size(), textureIDs.data());
+
+	GL::Disable(EnableCap::DepthTest);
+	GL::DepthMask(false);
+
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+void Renderer::Draw(
+	const glm::vec4 &clearColor,
+	const glm::vec4 &fogColor)
 {
 	NV_PROFILE_FUNC;
 
 	GL::DepthMask(true);
-	
-	s_Framebuffer.Resize(s_CurrentDisplayWidth, s_CurrentDisplayHeight);
 
+	s_Framebuffer.Resize(s_CurrentDisplayWidth, s_CurrentDisplayHeight);
 	s_Framebuffer.Bind();
 	s_Framebuffer.ClearAttachment(0, clearColor);
 	s_Framebuffer.ClearAttachment(1, glm::zero<glm::vec4>());
 	s_Framebuffer.ClearAttachment(2, glm::zero<glm::vec4>());
 	s_Framebuffer.ClearAttachment(3, glm::zero<glm::vec4>());
 	s_Framebuffer.ClearAttachment(1.0f, 0);
+
+	glViewport(0, 0, s_CurrentDisplayWidth, s_CurrentDisplayHeight);
+	glScissor(0, 0, s_CurrentDisplayWidth, s_CurrentDisplayHeight);
 
 	s_FrameSync.WaitClient(SyncTimeoutInfinite);
 
@@ -517,12 +563,10 @@ void Renderer::Draw(const glm::vec4& clearColor)
 		sizeof(PointLightData) * s_MaxPointLightsCount,
 		sizeof(DirLightData) * s_DirLightsCount);
 
-	glViewport(0, 0, s_CurrentDisplayWidth, s_CurrentDisplayHeight);
-	glScissor(0, 0, s_CurrentDisplayWidth, s_CurrentDisplayHeight);
-
 	ExecuteGeometryPass();
 	ExecuteLightingPass();
 	ExecuteTransparentPass();
+	ExecuteFogPass(fogColor);
 
 	s_FrameSync.Set();
 
@@ -553,7 +597,7 @@ void Renderer::_Initialize(
 	int frameWidth,
 	int frameHeight,
 	GLADloadfunc getProcAddressFunc,
-	const RendererSettings& settings)
+	const RendererSettings &settings)
 {
 	NV_PROFILE_FUNC;
 
@@ -576,7 +620,7 @@ void Renderer::_Initialize(
 	glFrontFace(GL_CCW);
 	glCullFace(GL_BACK);
 	glDebugMessageCallback(
-		[](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei, const GLchar* message, const void*)
+		[](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei, const GLchar *message, const void *)
 		{
 			switch (severity)
 			{
@@ -595,38 +639,39 @@ void Renderer::_Initialize(
 		},
 		nullptr);
 
-	const Rect viewportRect { 0, 0, frameWidth, frameHeight };
+	const Rect viewportRect{0, 0, frameWidth, frameHeight};
 	SetViewport(viewportRect, viewportRect);
 
-	const std::array<uint8_t, 4> whiteTextureData{ 255, 255, 255, 255 };
+	const std::array<uint8_t, 4> whiteTextureData{255, 255, 255, 255};
 	s_WhiteTexture = Texture(
 		TextureTarget::Texture2D,
-		TextureSpec {
+		TextureSpec{
 			.Size = {1, 1, 0},
 			.Format = InternalFormat::RGBA8,
 			.AllowBindless = true});
 	s_WhiteTexture.Upload(
-		TextureUploadInfo {
+		TextureUploadInfo{
 			.Size = {1, 1, 0},
 			.PixelFormat = PixelFormat::RGBA,
-			.PixelType = PixelType::UnsignedByte },
+			.PixelType = PixelType::UnsignedByte},
 		whiteTextureData.data());
 	s_WhiteTexture.MakeResident();
 
 	s_DeferredGeometryProgram = CreateDeferredGeometryShaderProgram();
 	s_DeferredLightProgram = CreateDeferredLightingShaderProgram();
 	s_DeferredTransparentProgram = CreateDeferredTransparentShaderProgram();
+	s_DeferredFogProgram = CreateDeferredFogProgram();
 
 	s_InstanceBuffer = PersistentMappedBuffer(
 		sizeof(InstanceData) * 512,
 		BufferAccessFlags::Writable);
 	s_InstanceBuffer.SetDebugName("InstanceBuffer");
-	
+
 	s_CameraDataBuffer = PersistentMappedBuffer(
 		sizeof(CameraData),
 		BufferAccessFlags::Writable);
 	s_CameraDataBuffer.SetDebugName("CameraBuffer");
-	
+
 	s_MaterialsBuffer = PersistentMappedBuffer(
 		sizeof(Material) * settings.MaxMaterials,
 		BufferAccessFlags::Writable);
@@ -641,41 +686,46 @@ void Renderer::_Initialize(
 	s_DirLights = s_LightsBuffer.GetBasePtr<DirLightData>(sizeof(PointLightData) * settings.MaxPointLights);
 
 	s_VertexArray = VertexArray({
-		VertexInput {
+		VertexInput{
 			.Stride = sizeof(ModelVertex),
 			.Descriptors = {
-				VertexDescriptor {
+				VertexDescriptor{
 					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inPosition"),
 					.AttributeType = AttributeType::Float,
 					.Count = 3,
 				},
-				VertexDescriptor {
+				VertexDescriptor{
 					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inNormal"),
 					.AttributeType = AttributeType::Float,
 					.Count = 3,
 				},
-				VertexDescriptor {
+				VertexDescriptor{
 					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inTexCoord"),
 					.AttributeType = AttributeType::Float,
 					.Count = 2,
 				},
 			},
 		},
-		VertexInput {
+		VertexInput{
 			.Stride = sizeof(InstanceData),
 			.Descriptors = {
-				VertexDescriptor {
-					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inBindlessHandleMaterialIndex"),
+				VertexDescriptor{
+					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inMaterialIndex"),
 					.AttributeType = AttributeType::UnsignedInt,
-					.Count = 3,
+					.Count = 1,
 				},
-				VertexDescriptor {
+				VertexDescriptor{
+					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inBindlessHandle"),
+					.AttributeType = AttributeType::UnsignedInt,
+					.Count = 2,
+				},
+				VertexDescriptor{
 					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inTransform"),
 					.AttributeType = AttributeType::Float,
 					.Count = 4,
 					.Rows = 4,
 				},
-				VertexDescriptor {
+				VertexDescriptor{
 					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inNormalTransform"),
 					.AttributeType = AttributeType::Float,
 					.Count = 3,
@@ -688,36 +738,42 @@ void Renderer::_Initialize(
 	});
 
 	s_Framebuffer = Framebuffer({
-		FramebufferAttachmentSpec {
+		FramebufferAttachmentSpec{
 			.Width = frameWidth,
 			.Height = frameHeight,
 			.Format = InternalFormat::RGBA8,
 			.Flags = AttachmentFlags::DrawDest | AttachmentFlags::Resizable,
-		}, // color + specular attachment
-		FramebufferAttachmentSpec {
+		}, // [0] color + specular attachment
+		FramebufferAttachmentSpec{
 			.Width = frameWidth,
 			.Height = frameHeight,
 			.Format = InternalFormat::RGB16F,
 			.Flags = AttachmentFlags::DrawDest | AttachmentFlags::Resizable,
-		}, // position attachment
-		FramebufferAttachmentSpec {
+		}, // [1] position attachment
+		FramebufferAttachmentSpec{
 			.Width = frameWidth,
 			.Height = frameHeight,
 			.Format = InternalFormat::RGB16F,
 			.Flags = AttachmentFlags::DrawDest | AttachmentFlags::Resizable,
-		}, // normal attachment
-		FramebufferAttachmentSpec {
-			.Width = frameWidth,
-			.Height = frameHeight,
-			.Format = InternalFormat::Depth24Stencil8,
-			.Flags = AttachmentFlags::UseRenderbuffer | AttachmentFlags::Resizable,
-		}, // depth attachment
-		FramebufferAttachmentSpec {
+		}, // [2] normal attachment
+		FramebufferAttachmentSpec{
 			.Width = frameWidth,
 			.Height = frameHeight,
 			.Format = InternalFormat::RGB8,
 			.Flags = AttachmentFlags::DrawDest | AttachmentFlags::Resizable,
-		}, // final output
+		}, // [3] output color attachment
+		FramebufferAttachmentSpec{
+			.Width = frameWidth,
+			.Height = frameHeight,
+			.Format = InternalFormat::RGB8,
+			.Flags = AttachmentFlags::DrawDest | AttachmentFlags::Resizable,
+		}, // [4] final output
+		FramebufferAttachmentSpec{
+			.Width = frameWidth,
+			.Height = frameHeight,
+			.Format = InternalFormat::Depth24Stencil8,
+			.Flags = AttachmentFlags::Resizable,
+		}, // [5] depth attachment
 	});
 }
 

@@ -92,7 +92,7 @@ static void RetrieveProgramInterface(
 	GLuint program,
 	ProgramInterface1 interface,
 	const std::span<ProgramResourceProps, 2> propNames,
-	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>>& storage)
+	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>> &storage)
 {
 	NV_PROFILE_FUNC;
 
@@ -122,15 +122,15 @@ static void RetrieveProgramInterface(
 			props[1]);
 		NormalizeArrayResourceName(resourceName);
 
-		storage.insert({ std::move(resourceName), props[0] });
+		storage.insert({std::move(resourceName), props[0]});
 	}
 }
 
 static void RetrieveStorageBlocksInterface(
 	GLuint program,
-	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>>& storage)
+	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>> &storage)
 {
-	std::array<ProgramResourceProps, 2> propNames{ ProgramResourceProps::BufferBinding, ProgramResourceProps::NameLength };
+	std::array<ProgramResourceProps, 2> propNames{ProgramResourceProps::BufferBinding, ProgramResourceProps::NameLength};
 	RetrieveProgramInterface(
 		program,
 		ProgramInterface1::ShaderStorageBlock,
@@ -140,9 +140,9 @@ static void RetrieveStorageBlocksInterface(
 
 static void RetrieveUniformBlocksInterface(
 	GLuint program,
-	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>>& storage)
+	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>> &storage)
 {
-	std::array<ProgramResourceProps, 2> propNames{ ProgramResourceProps::BufferBinding, ProgramResourceProps::NameLength };
+	std::array<ProgramResourceProps, 2> propNames{ProgramResourceProps::BufferBinding, ProgramResourceProps::NameLength};
 	RetrieveProgramInterface(
 		program,
 		ProgramInterface1::UniformBlock,
@@ -152,9 +152,9 @@ static void RetrieveUniformBlocksInterface(
 
 static void RetrieveInputInterface(
 	GLuint program,
-	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>>& storage)
+	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>> &storage)
 {
-	std::array<ProgramResourceProps, 2> propNames{ ProgramResourceProps::Location, ProgramResourceProps::NameLength };
+	std::array<ProgramResourceProps, 2> propNames{ProgramResourceProps::Location, ProgramResourceProps::NameLength};
 	RetrieveProgramInterface(
 		program,
 		ProgramInterface1::ProgramInput,
@@ -241,7 +241,7 @@ ShaderProgram ShaderProgram::FromBinary(GLenum binaryFormat, const std::span<uin
 
 ShaderProgram ShaderProgram::FromBinary(
 	GLenum binaryFormat,
-	const uint8_t* binary,
+	const uint8_t *binary,
 	size_t binarySize)
 {
 	NV_PROFILE_FUNC;
@@ -270,7 +270,7 @@ ShaderProgram ShaderProgram::FromBinary(
 {
 	NV_PROFILE_FUNC;
 
-	const auto [data, size] = File::ReadBinary(filepath);
+	const auto [data, size] = File::ReadWholeBinary(filepath);
 	return FromBinary(binaryFormat, data.get(), size);
 }
 
@@ -356,8 +356,20 @@ void ShaderProgram::SetUniform(const std::string_view name, uint32_t value) cons
 	glProgramUniform1ui(id_, GetResourceLocation(name), value);
 }
 
-void ShaderProgram::SetUniform(const std::string_view name, const glm::vec3& value) const
+void ShaderProgram::SetUniform(const std::string_view name, const glm::vec3 &value) const
 {
 	NV_PROFILE_FUNC;
 	glProgramUniform3f(id_, GetResourceLocation(name), value.x, value.y, value.z);
+}
+
+void ShaderProgram::SetUniform(const std::string_view name, const glm::vec2 &value) const
+{
+	NV_PROFILE_FUNC;
+	glProgramUniform2f(id_, GetResourceLocation(name), value.x, value.y);
+}
+
+void ShaderProgram::SetUniform(const std::string_view name, const glm::vec4 &value) const
+{
+	NV_PROFILE_FUNC;
+	glProgramUniform4f(id_, GetResourceLocation(name), value.x, value.y, value.z, value.w);
 }

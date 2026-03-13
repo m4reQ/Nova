@@ -5,8 +5,7 @@ using namespace Nova;
 
 static constexpr bool CheckSyncWaitResult(GLenum result) noexcept
 {
-    return result == GL_ALREADY_SIGNALED
-        || result == GL_CONDITION_SATISFIED;
+    return result == GL_ALREADY_SIGNALED || result == GL_CONDITION_SATISFIED;
 }
 
 static constexpr bool SyncWaitFailed(GLenum result) noexcept
@@ -22,7 +21,7 @@ static GLenum WaitClientSyncInfinite(GLsync sync) noexcept
     {
         result = glClientWaitSync(
             sync,
-            GL_SYNC_FLUSH_COMMANDS_BIT,
+            0,
             SyncInfiniteTimeoutThresholdNs);
     } while (result != GL_ALREADY_SIGNALED && result != GL_CONDITION_SATISFIED && result != GL_WAIT_FAILED);
 
@@ -40,7 +39,8 @@ void Sync::Set() noexcept
     NV_PROFILE_FUNC;
 
     const auto deleteIndex = (currentSyncIndex_ + 1) % SyncHandlesCount;
-    if (syncHandles_[deleteIndex]) {
+    if (syncHandles_[deleteIndex])
+    {
         NV_PROFILE_SCOPE("::DeleteSyncHandle");
 
         glDeleteSync(syncHandles_[deleteIndex]);
@@ -65,8 +65,8 @@ bool Sync::WaitClient(size_t timeoutNs) noexcept
         return true;
 
     const auto result = timeoutNs == SyncTimeoutInfinite
-        ? WaitClientSyncInfinite(sync)
-        : glClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, timeoutNs);
+                            ? WaitClientSyncInfinite(sync)
+                            : glClientWaitSync(sync, 0, timeoutNs);
     return CheckSyncWaitResult(result);
 }
 
@@ -85,7 +85,7 @@ bool Sync::IsSignaled() const noexcept
     NV_PROFILE_FUNC;
 
     const auto sync = Get();
-    
+
     if (!sync)
         return true;
 

@@ -15,13 +15,13 @@ constexpr float ScrollSensitivity = 1.0f;
 class CameraController final : public ScriptController
 {
 public:
-    void OnAttach(entt::registry& scene, entt::entity parentEntity) override
+    void OnAttach(entt::registry &scene, entt::entity parentEntity) override
     {
         camera_ = scene.try_get<CameraComponent>(parentEntity);
         lightTransform_ = scene.try_get<TransformComponent>(parentEntity);
     }
 
-    void OnMouseMove(const Nova::MouseMoveEvent& event) noexcept
+    void OnMouseMove(const Nova::MouseMoveEvent &event) noexcept
     {
         if (!isMouseCaptured_)
             return;
@@ -38,7 +38,7 @@ public:
                 glm::sin(cameraYaw_) * glm::cos(cameraPitch_)));
     }
 
-    void OnMouseScroll(const Nova::MouseScrollEvent& event) noexcept
+    void OnMouseScroll(const Nova::MouseScrollEvent &event) noexcept
     {
         if (!isMouseCaptured_)
             return;
@@ -49,27 +49,27 @@ public:
             1.57f);
     }
 
-    void OnKey(const Nova::KeyEvent& event) noexcept
+    void OnKey(const Nova::KeyEvent &event) noexcept
     {
-        if (event.IsPressed() && event.GetKey() == Nova::Key::_1)
+        if (event.IsPressed() && event.GetKey() == Nova::Key::F1)
         {
             isMouseCaptured_ = !isMouseCaptured_;
             Nova::Window::SetCursorCapture(isMouseCaptured_);
         }
     }
 
-    void OnEvent(const Nova::Event& event) override
+    void OnEvent(const Nova::Event &event) override
     {
         switch (event.GetEventType())
         {
         case Nova::EventType::MouseMove:
-            OnMouseMove((const Nova::MouseMoveEvent&)event);
+            OnMouseMove((const Nova::MouseMoveEvent &)event);
             break;
         case Nova::EventType::MouseScroll:
-            OnMouseScroll((const Nova::MouseScrollEvent&)event);
+            OnMouseScroll((const Nova::MouseScrollEvent &)event);
             break;
         case Nova::EventType::Key:
-            OnKey((const Nova::KeyEvent&)event);
+            OnKey((const Nova::KeyEvent &)event);
             break;
         }
     }
@@ -105,8 +105,8 @@ public:
     }
 
 private:
-    CameraComponent* camera_;
-    TransformComponent* lightTransform_;
+    CameraComponent *camera_;
+    TransformComponent *lightTransform_;
 
     float cameraPitch_ = 0.0f;
     float cameraYaw_ = glm::radians(-90.0f);

@@ -30,6 +30,8 @@ layout(std140) uniform uCameraData
 	mat4 cameraView;
 	mat4 cameraProjection;
 	vec3 cameraPosition;
+    float zNear;
+    float zFar;
 };
 
 layout(std430, binding = 1) readonly buffer sPointLightsBuffer
@@ -41,6 +43,55 @@ layout(std430, binding = 2) readonly buffer sDirLightsBuffer
 {
     DirLight dirLights[];
 };
+
+// TODO Add support for #include directives
+
+/// Calculates diffuse color using Blinn-Phong reflection model.
+/// `normal` vector must be normalized before being passed to this function.
+/// `lightDir` must be normalized before being passed to this function.
+vec3 calculateDiffuseBlinnPhong(
+    vec3 normal,
+    vec3 albedoColor,
+    vec3 lightColor,
+    vec3 lightDir,
+    float lightIntensity)
+{
+    float nDotL = max(dot(normal, lightDir), 0.0);
+    return nDotL * albedoColor * lightColor * lightIntensity;
+}
+
+/// Calculates specular reflection color using Blinn-Phong reflection model.
+/// `normal` vector must be normalized before being passed to this function.
+/// `lightDir` must be normalized before being passed to this function.
+vec3 calculateSpecularBlinnPhong(
+    vec3 normal,
+    vec3 viewDir,
+    vec3 lightColor,
+    vec3 lightDir,
+    float lightIntensity,
+    float specularIntensity,
+    float shininess)
+{
+    vec3 h = normalize(lightDir + viewDir);
+    return pow(max(dot(normal, h), 0.0), shininess)
+        * specularIntensity
+        * lightColor
+        * lightIntensity;
+}
+
+/// Calculates light attenuation based on distance from the light source.
+float calculateSmoothRadiusAttenuation(float lightDistance, float lightRadius)
+{
+    float x = lightDistance / lightRadius;
+    float attenuation = max(1.0 - x * x, 0.0);
+    return attenuation * attenuation;
+}
+
+/// Calculates light attenuation based on position of light and shaded fragment.
+float calculateSmoothRadiusAttenuationPos(vec3 lightPos, vec3 fragPos, float lightRadius)
+{
+    return calculateSmoothRadiusAttenuation(length(lightPos - fragPos), lightRadius);
+}
 
 void main()
 {
@@ -55,20 +106,24 @@ void main()
     for (uint i = 0; i < uDirLightsCount; i++)
     {
         DirLight light = dirLights[i];
-
-        vec3 l = normalize(-light.direction);
-        vec3 v = viewDir;
-        vec3 h = normalize(l + v);
-
-        // diffuse
-        float nDotL = max(dot(normal, l), 0.0);
-        vec3 diffuse = nDotL * albedoSpecular.rgb * light.color.rgb * light.color.a;
-
-        // specular
-        vec3 specular = pow(max(dot(normal, h), 0.0), uShininess) *
-            albedoSpecular.a *
-            light.color.rgb *
-            light.color.a;
+        
+        vec3 lightDir = normalize(-light.direction);
+        
+        vec3 diffuse = calculateDiffuseBlinnPhong(
+            normal,
+            albedoSpecular.rgb,
+            light.color.rgb,
+            lightDir,
+            light.color.a);
+        
+        vec3 specular = calculateSpecularBlinnPhong(
+            normal,
+            viewDir,
+            light.color.rgb,
+            lightDir,
+            light.color.a,
+            albedoSpecular.a,
+            uShininess);
 
         lighting += diffuse + specular;
     }
@@ -82,26 +137,26 @@ void main()
 
         if (dist < light.radius)
         {
-            vec3 l = normalize(lightVec);
-            vec3 v = viewDir;
-            vec3 h = normalize(l + v);
+            vec3 lightDir = normalize(lightVec);
 
-            // Smooth radius attenuation
-            float x = dist / light.radius;
-            float attenuation = max(1.0 - x * x, 0.0);
-            attenuation *= attenuation;
+            float attenuation = calculateSmoothRadiusAttenuation(dist, light.radius);
 
-            // diffuse
-            float nDotL = max(dot(normal, l), 0.0);
-            vec3 diffuse = nDotL * albedoSpecular.rgb * light.color.rgb * light.color.a;
+            vec3 diffuse = calculateDiffuseBlinnPhong(
+                normal,
+                albedoSpecular.rgb,
+                light.color.rgb,
+                lightDir,
+                light.color.a);
 
-            // specular
-            vec3 specular = 
-                pow(max(dot(normal, h), 0.0), uShininess) *
-                albedoSpecular.a *
-                light.color.rgb *
-                light.color.a;
-            
+            vec3 specular = calculateSpecularBlinnPhong(
+                normal,
+                viewDir,
+                light.color.rgb,
+                lightDir,
+                light.color.a,
+                albedoSpecular.a,
+                uShininess);
+
             lighting += (diffuse + specular) * attenuation;
         }
     }

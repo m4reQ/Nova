@@ -4,6 +4,7 @@
 #include <Nova/debug/Profile.hpp>
 #include <Nova/core/Build.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glad/gl.h>
 
 using namespace Nova;
 
@@ -11,24 +12,24 @@ static constexpr const std::string_view FramebufferStatusToString(FramebufferSta
 {
 	switch (status)
 	{
-		case FramebufferStatus::Complete:
-			return "Complete";
-		case FramebufferStatus::Undefined:
-			return "Undefined";
-		case FramebufferStatus::IncompleteAttachment:
-			return "IncompleteAttachment";
-		case FramebufferStatus::IncompleteMissingAttachment:
-			return "IncompleteMissingAttachment";
-		case FramebufferStatus::IncompleteDrawBuffer:
-			return "IncompleteDrawBuffer";
-		case FramebufferStatus::IncompleteReadBuffer:
-			return "IncompleteReadBuffer";
-		case FramebufferStatus::Unsupported:
-			return "Unsupported";
-		case FramebufferStatus::IncompleteMultisample:
-			return "IncompleteMultisample";
-		case FramebufferStatus::IncompleteLayerTargets:
-			return "IncompleteLayerTargets";
+	case FramebufferStatus::Complete:
+		return "Complete";
+	case FramebufferStatus::Undefined:
+		return "Undefined";
+	case FramebufferStatus::IncompleteAttachment:
+		return "IncompleteAttachment";
+	case FramebufferStatus::IncompleteMissingAttachment:
+		return "IncompleteMissingAttachment";
+	case FramebufferStatus::IncompleteDrawBuffer:
+		return "IncompleteDrawBuffer";
+	case FramebufferStatus::IncompleteReadBuffer:
+		return "IncompleteReadBuffer";
+	case FramebufferStatus::Unsupported:
+		return "Unsupported";
+	case FramebufferStatus::IncompleteMultisample:
+		return "IncompleteMultisample";
+	case FramebufferStatus::IncompleteLayerTargets:
+		return "IncompleteLayerTargets";
 	}
 
 	NV_UNREACHABLE;
@@ -68,7 +69,7 @@ static constexpr Attachment GetAttachmentPoint(InternalFormat format, size_t ind
 	}
 }
 
-static void SetupTextureFromSpec(GLuint texture, const FramebufferAttachmentSpec& spec) noexcept
+static void SetupTextureFromSpec(GLuint texture, const FramebufferAttachmentSpec &spec) noexcept
 {
 	NV_PROFILE_FUNC;
 
@@ -80,7 +81,7 @@ static void SetupTextureFromSpec(GLuint texture, const FramebufferAttachmentSpec
 	GL::TextureParameter(texture, spec.MagFilter);
 }
 
-static void SetupRenderbufferFromSpec(GLuint renderbuffer, const FramebufferAttachmentSpec& spec) noexcept
+static void SetupRenderbufferFromSpec(GLuint renderbuffer, const FramebufferAttachmentSpec &spec) noexcept
 {
 	NV_PROFILE_FUNC;
 
@@ -100,7 +101,7 @@ Framebuffer::Framebuffer(std::span<const FramebufferAttachmentSpec> attachmentSp
 	std::vector<GLenum> drawBuffers;
 	for (GLsizei i = 0; i < attachmentsCount; i++)
 	{
-		const auto& spec = attachmentSpecs[i];
+		const auto &spec = attachmentSpecs[i];
 		const auto attachmentPoint = GetAttachmentPoint(spec.Format, i);
 
 		GLuint attachmentID{};
@@ -124,14 +125,14 @@ Framebuffer::Framebuffer(std::span<const FramebufferAttachmentSpec> attachmentSp
 				attachmentID,
 				0);
 		}
-		
+
 		if (spec.IsDrawDest() && IsColorFormat(spec.Format))
 			drawBuffers.emplace_back((GLenum)attachmentPoint);
 
 		attachments_.emplace_back(
 			FramebufferAttachment{
 				.Spec = spec,
-				.AttachmentID = attachmentID });
+				.AttachmentID = attachmentID});
 	}
 
 	glNamedFramebufferDrawBuffers(id_, (GLsizei)drawBuffers.size(), drawBuffers.data());
@@ -162,7 +163,7 @@ void Framebuffer::Delete() noexcept
 {
 	NV_PROFILE_FUNC;
 
-	for (const auto& attachment : attachments_)
+	for (const auto &attachment : attachments_)
 	{
 		if (attachment.Spec.UseRenderbuffer())
 			glDeleteRenderbuffers(1, &attachment.AttachmentID);
@@ -174,7 +175,6 @@ void Framebuffer::Delete() noexcept
 	id_ = 0;
 }
 
-
 void Framebuffer::Resize(GLsizei width, GLsizei height) noexcept
 {
 	NV_PROFILE_FUNC;
@@ -183,7 +183,7 @@ void Framebuffer::Resize(GLsizei width, GLsizei height) noexcept
 
 	for (size_t i = 0; i < attachments_.size(); i++)
 	{
-		auto& attachment = attachments_[i];
+		auto &attachment = attachments_[i];
 
 		if (attachment.Spec.IsResizable() &&
 			attachment.Spec.Width != width &&
@@ -191,7 +191,7 @@ void Framebuffer::Resize(GLsizei width, GLsizei height) noexcept
 		{
 			attachment.Spec.Width = width;
 			attachment.Spec.Height = height;
-			
+
 			const auto attachmentPoint = GetAttachmentPoint(attachment.Spec.Format, i);
 
 			if (attachment.Spec.UseRenderbuffer())
@@ -220,14 +220,14 @@ void Framebuffer::Resize(GLsizei width, GLsizei height) noexcept
 	}
 }
 
-void Framebuffer::Resize(const glm::ivec2& size) noexcept
+void Framebuffer::Resize(const glm::ivec2 &size) noexcept
 {
 	Resize(size.x, size.y);
 }
 
 void Framebuffer::Blit(Attachment attachment) const noexcept
 {
-	const auto& srcAttachment = GetAttachment(0);
+	const auto &srcAttachment = GetAttachment(0);
 	const auto [dstWidth, dstHeight] = Window::GetFramebufferSize();
 
 	glNamedFramebufferReadBuffer(id_, (GLenum)attachment);
@@ -240,7 +240,7 @@ void Framebuffer::Blit(Attachment attachment) const noexcept
 		GL_NEAREST);
 }
 
-void Framebuffer::ClearAttachment(GLint drawBuffer, const glm::vec4& color)
+void Framebuffer::ClearAttachment(GLint drawBuffer, const glm::vec4 &color)
 {
 	glClearNamedFramebufferfv(id_, GL_COLOR, drawBuffer, glm::value_ptr(color));
 }

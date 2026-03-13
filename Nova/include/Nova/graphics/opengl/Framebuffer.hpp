@@ -59,10 +59,10 @@ namespace Nova
 		{
 			return IsFlagSet(Flags, AttachmentFlags::UseRenderbuffer);
 		}
-		
+
 		constexpr glm::ivec2 GetSize() const noexcept
 		{
-			return { Width, Height };
+			return {Width, Height};
 		}
 	};
 
@@ -76,32 +76,32 @@ namespace Nova
 	{
 	public:
 		Framebuffer() = default;
-		
-		Framebuffer(const Framebuffer&) = delete;
-		
-		constexpr Framebuffer(Framebuffer&& other) noexcept
-			: id_(std::exchange(other.id_, 0)), attachments_(std::move(other.attachments_)) { }
+
+		Framebuffer(const Framebuffer &) = delete;
+
+		constexpr Framebuffer(Framebuffer &&other) noexcept
+			: id_(std::exchange(other.id_, 0)), attachments_(std::move(other.attachments_)) {}
 
 		Framebuffer(std::span<const FramebufferAttachmentSpec> attachmentSpecs);
-		
-		Framebuffer(std::initializer_list< FramebufferAttachmentSpec> attachmentSpecs)
-			: Framebuffer(std::span(attachmentSpecs)) { }
+
+		Framebuffer(std::initializer_list<FramebufferAttachmentSpec> attachmentSpecs)
+			: Framebuffer(std::span(attachmentSpecs)) {}
 
 		// TODO Add destructor for framebuffer once correct destruction order is figured out
 		// ~Framebuffer() noexcept;
 		void Delete() noexcept;
-		
+
 		void Bind() const noexcept;
-		
+
 		void Unbind() const noexcept;
 
 		void Resize(GLsizei width, GLsizei height) noexcept;
 
-		void Resize(const glm::ivec2& size) noexcept;
+		void Resize(const glm::ivec2 &size) noexcept;
 
 		void Blit(Attachment attachment) const noexcept;
 
-		void ClearAttachment(GLint drawBuffer, const glm::vec4& color);
+		void ClearAttachment(GLint drawBuffer, const glm::vec4 &color);
 
 		void ClearAttachment(GLint drawBuffer, float r, float g, float b, float a);
 
@@ -111,11 +111,11 @@ namespace Nova
 
 		void ClearAttachment(GLfloat depth, GLint stencil);
 
-		constexpr const FramebufferAttachment& GetAttachment(size_t index) const { return attachments_[index]; }
+		constexpr const FramebufferAttachment &GetAttachment(size_t index) const { return attachments_[index]; }
 
-		Framebuffer& operator=(const Framebuffer&) = delete;
-		
-		constexpr Framebuffer& operator=(Framebuffer&& other) noexcept
+		Framebuffer &operator=(const Framebuffer &) = delete;
+
+		constexpr Framebuffer &operator=(Framebuffer &&other) noexcept
 		{
 			id_ = std::exchange(other.id_, 0);
 			attachments_ = std::move(other.attachments_);

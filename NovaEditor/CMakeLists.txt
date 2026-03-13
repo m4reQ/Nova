@@ -9,6 +9,13 @@ set_target_properties(
     NovaEditor
     PROPERTIES
     CXX_STANDARD 23)
+
+# if(MSVC)
+#     set_target_properties(
+#         NovaEditor
+#         PROPERTIES
+#         LINK_FLAGS "/NODEFAULTLIB:LIBCMT")
+# endif()
 add_custom_command(
     TARGET NovaEditor
     POST_BUILD

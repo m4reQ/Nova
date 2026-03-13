@@ -78,7 +78,7 @@ namespace Nova
     template <typename T>
     struct XXHasher
     {
-        XXH64_hash_t operator()(const T& value) const noexcept
+        XXH64_hash_t operator()(const T &value) const noexcept
         {
             static_assert(std::is_trivially_copyable_v<T>, "xxHash hasher can hash only POD structs.");
             return XXH3_64bits(&value, sizeof(T));
@@ -88,6 +88,6 @@ namespace Nova
     template <typename T>
     constexpr bool IsFlagSet(T flags, T bit) noexcept
     {
-        return (flags && bit) == bit;
+        return (flags & bit) == bit;
     }
 }

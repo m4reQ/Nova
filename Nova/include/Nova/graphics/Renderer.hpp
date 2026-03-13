@@ -44,56 +44,34 @@ namespace Nova
 	namespace Renderer
 	{
 		NV_API void Render(
-			const Model* model,
-			const Material& material,
-			const glm::mat4& transform);
+			const Model *model,
+			const Material &material,
+			const glm::mat4 &transform);
 
 		NV_API void SetCamera(
-			const glm::mat4& view,
-			const glm::mat4& projection,
-			const glm::vec3& viewPosition);
+			const glm::mat4 &view,
+			const glm::mat4 &projection,
+			const glm::vec3 &position,
+			float zNear,
+			float zFar);
 
-		NV_API void SetViewport(const Rect<int>& viewport) noexcept;
+		NV_API void SetViewport(const Rect<int> &viewport) noexcept;
 
 		NV_API void SetViewport(
-			const Rect<int>& viewport,
-			const Rect<int>& scissor) noexcept;
+			const Rect<int> &viewport,
+			const Rect<int> &scissor) noexcept;
 
 		NV_API void SetPolygonMode(PolygonMode mode) noexcept;
 
 		NV_API GLuint GetRenderTextureID(RenderTexture texture) noexcept;
 
-		NV_API const RendererInfo& GetInfo() noexcept;
+		NV_API const RendererInfo &GetInfo() noexcept;
 
 		NV_API void SetDisplaySize(int width, int height) noexcept;
 
-		/*NV_API void BeginFrame(int displayWidth, int displayHeight);
+		NV_API void AddPointLight(const glm::vec4 &color, const glm::vec3 &position, float radius);
 
-		NV_API void BeginFrame(glm::ivec2 displaySize);
-
-		NV_API void BeginFrame(std::pair<int, int> displaySize);
-
-		NV_API void SetViewport(const Rect<int> &viewport) noexcept;
-
-		NV_API void SetViewport(const Rect<int> &viewport, const Rect<int> &scissor) noexcept;
-
-		NV_API void SetCameraTransform(const glm::mat4 &view, const glm::mat4 &projection);
-
-		NV_API void SetModelBuffers(const Buffer &vertexBuffer) noexcept;
-
-		NV_API void SetModelBuffers(const Buffer &vertexBuffer, const Buffer &elementBuffer, GLsizei elementsCount, GLenum elementType) noexcept;
-
-		NV_API void SetShader(const ShaderProgram &program);
-
-		NV_API void RenderInstance(const glm::mat4 &transform, const glm::vec4 &color);
-
-		NV_API void RenderInstance(const glm::mat4 &transform, const glm::vec4 &color, const Texture &texture);
-
-		NV_API void RenderInstance(const glm::mat4 &transform, const glm::vec4 &color, const Texture &texture, uint32_t entityID);*/
-
-		NV_API void AddPointLight(const glm::vec4& color, const glm::vec3& position, float radius);
-
-		NV_API void AddDirectionalLight(const glm::vec4& color, const glm::vec3& direction);
+		NV_API void AddDirectionalLight(const glm::vec4 &color, const glm::vec3 &direction);
 
 		NV_API void Clear(ClearMask mask = ClearMask::ColorBufferBit) noexcept;
 
@@ -101,7 +79,9 @@ namespace Nova
 
 		NV_API void SetClearColor(const glm::vec4 &color) noexcept;
 
-		NV_API void Draw(const glm::vec4& clearColor);
+		NV_API void Draw(
+			const glm::vec4 &clearColor,
+			const glm::vec4 &fogColor);
 
 		NV_API void DisplayFramebuffer() noexcept;
 
@@ -109,7 +89,7 @@ namespace Nova
 			int frameWidth,
 			int frameHeight,
 			GLADloadfunc getProcAddressFunc,
-			const RendererSettings& settings);
+			const RendererSettings &settings);
 
 		void _Shutdown();
 	}

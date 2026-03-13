@@ -4,7 +4,7 @@
 
 using namespace Nova;
 
-PersistentMappedBuffer::PersistentMappedBuffer(const PersistentMappedBuffer& other)
+PersistentMappedBuffer::PersistentMappedBuffer(const PersistentMappedBuffer &other)
 {
     NV_PROFILE_FUNC;
 
@@ -19,14 +19,10 @@ PersistentMappedBuffer::PersistentMappedBuffer(GLsizeiptr size, BufferAccessFlag
 
     id_ = GL::CreateBuffer();
 
-    const auto storageFlags = (BufferStorageFlags)accessFlags
-        | BufferStorageFlags::MapPersistentBit;
+    const auto storageFlags = (BufferStorageFlags)accessFlags | BufferStorageFlags::MapPersistentBit;
     GL::NamedBufferStorage(id_, size, data, storageFlags);
 
-    const auto mapFlags = (BufferMapFlags)accessFlags
-        | BufferMapFlags::MapPersistentBit
-        | BufferMapFlags::MapFlushExplicitBit
-        | BufferMapFlags::MapUnsynchronizedBit;
+    const auto mapFlags = (BufferMapFlags)accessFlags | BufferMapFlags::MapPersistentBit | BufferMapFlags::MapFlushExplicitBit | BufferMapFlags::MapUnsynchronizedBit;
     dataBase_ = GL::MapNamedBufferRange(id_, 0, size, mapFlags);
     dataCurrent_ = dataBase_;
 }
@@ -41,10 +37,10 @@ GLsizeiptr PersistentMappedBuffer::Commit(bool wholeBuffer) noexcept
     NV_PROFILE_FUNC;
 
     const auto flushedDataSize = wholeBuffer ? GetSize() : GetDataSize();
-    
+
     if (flushedDataSize > 0)
         glFlushMappedNamedBufferRange(id_, 0, flushedDataSize);
-        
+
     dataCurrent_ = dataBase_;
 
     return flushedDataSize;
@@ -61,32 +57,32 @@ void PersistentMappedBuffer::Discard() noexcept
     dataCurrent_ = dataBase_;
 }
 
-void PersistentMappedBuffer::Write(const void* data, GLsizeiptr dataSize) noexcept
+void PersistentMappedBuffer::Write(const void *data, GLsizeiptr dataSize) noexcept
 {
     NV_PROFILE_FUNC;
-    
+
     std::memcpy(dataCurrent_, data, dataSize);
-    dataCurrent_ = (uint8_t*)dataCurrent_ + dataSize;
+    dataCurrent_ = (uint8_t *)dataCurrent_ + dataSize;
 }
 
 void PersistentMappedBuffer::Bind(BufferBindTarget target) const noexcept
 {
     NV_PROFILE_FUNC;
-    
+
     GL::BindBuffer(target, id_);
 }
 
 void PersistentMappedBuffer::Bind(BufferBaseTarget target, GLuint index) const noexcept
 {
     NV_PROFILE_FUNC;
-    
+
     GL::BindBufferBase(target, index, id_);
 }
 
 void PersistentMappedBuffer::Bind(BufferBaseTarget target, GLuint index, GLintptr offset, GLsizeiptr size) const noexcept
 {
     NV_PROFILE_FUNC;
-    
+
     GL::BindBufferRange(target, index, id_, offset, size);
 }
 
