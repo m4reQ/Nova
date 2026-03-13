@@ -10,7 +10,6 @@
 #include <Nova/ecs/components/NameComponent.hpp>
 #include <Nova/ecs/components/TransformComponent.hpp>
 #include <Nova/ecs/components/LightComponent.hpp>
-#include <Nova/ecs/components/TransformComponent.hpp>
 #include <Nova/ecs/components/CameraComponent.hpp>
 #include <Nova/ecs/components/RenderComponent.hpp>
 #include <Nova/ecs/components/ScriptComponent.hpp>
@@ -75,14 +74,12 @@ static glm::mat4 BuildTransformMatrix(const glm::vec3 &position, const glm::quat
 }
 
 template <typename TComponent>
-static void TryAddEntityComponentTreeNode(const entt::registry &registry, entt::entity entity, const std::string_view componentName)
+static void TryAddEntityComponentTreeNode(const entt::registry &registry, entt::entity entity, const std::string_view componentName, bool isSelected)
 {
-    const auto component = registry.try_get<TComponent>(entity);
-    if (component)
-    {
-        const auto name = std::format("{}##{}", componentName, (uint32_t)entity);
-        ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen);
-    }
+    if (registry.try_get<TComponent>(entity))
+        ImGui::TreeNodeEx(
+            std::format("{}##{}", componentName, (uint32_t)entity).c_str(),
+            ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | (isSelected ? ImGuiTreeNodeFlags_Selected : 0));
 }
 
 static void RenderScene(const entt::registry &scene, entt::entity cameraEntity)
@@ -94,7 +91,7 @@ static void RenderScene(const entt::registry &scene, entt::entity cameraEntity)
     auto cameraZNear = -1.0f;
     auto cameraZFar = 1.0f;
 
-    const auto camera = scene.try_get<CameraComponent>(cameraEntity);
+    const auto camera = scene.try_get<Nova::CameraComponent>(cameraEntity);
     if (camera)
     {
         cameraPosition = camera->Position;
@@ -104,7 +101,7 @@ static void RenderScene(const entt::registry &scene, entt::entity cameraEntity)
             camera->Position + camera->Front,
             camera->Up);
 
-        if (camera->Type == CameraType::Perspective)
+        if (camera->Type == Nova::CameraType::Perspective)
         {
             cameraZNear = camera->Data.Perspective.ZNear;
             cameraZFar = camera->Data.Perspective.ZFar;
@@ -132,7 +129,7 @@ static void RenderScene(const entt::registry &scene, entt::entity cameraEntity)
         cameraZFar);
 
     // set directional lights
-    scene.view<DirectionalLightComponent>().each(
+    scene.view<Nova::DirectionalLightComponent>().each(
         [](auto entity, const auto &lightComponent)
         {
             Nova::Renderer::AddDirectionalLight(
@@ -141,7 +138,7 @@ static void RenderScene(const entt::registry &scene, entt::entity cameraEntity)
         });
 
     // set point lights
-    scene.view<TransformComponent, PointLightComponent>().each(
+    scene.view<Nova::TransformComponent, Nova::PointLightComponent>().each(
         [](auto entity, const auto &transform, const auto &light)
         {
             Nova::Renderer::AddPointLight(
@@ -153,7 +150,7 @@ static void RenderScene(const entt::registry &scene, entt::entity cameraEntity)
     // render objects
     {
         NV_PROFILE_SCOPE("::RenderObjects");
-        scene.view<TransformComponent, RenderComponent>().each(
+        scene.view<Nova::TransformComponent, RenderComponent>().each(
             [](auto entity, const auto &transform, const auto &render)
             {
                 Nova::Renderer::Render(
@@ -168,6 +165,96 @@ static void RenderScene(const entt::registry &scene, entt::entity cameraEntity)
 
     // draw
     // Nova::Renderer::Draw(glm::vec4(0.529f, 0.529f, 0.529f, 1.0f));
+}
+
+static void AddDirectionalLightComponentInspector(entt::registry &scene, entt::entity entity) noexcept
+{
+    auto component = scene.try_get<Nova::DirectionalLightComponent>(entity);
+    if (component == nullptr)
+        return;
+
+    ImGui::SeparatorText("Directional light");
+    ImGui::ColorEdit3("Color", glm::value_ptr(component->Color));
+    ImGui::DragFloat("Intensity", &component->Intensity, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat3("Direction", glm::value_ptr(component->Direction), 0.01f, -1.0f, 1.0f);
+}
+
+static void AddCameraComponentInspector(entt::registry &scene, entt::entity entity) noexcept
+{
+    auto component = scene.try_get<Nova::CameraComponent>(entity);
+    if (component == nullptr)
+        return;
+
+    ImGui::SeparatorText("Camera");
+
+    const std::array<std::pair<Nova::CameraType, const char *>, 2> cameraTypes{
+        std::make_pair(Nova::CameraType::Orthographic, "orthographic"),
+        std::make_pair(Nova::CameraType::Perspective, "perspective"),
+    };
+
+    const auto currentCameraTypeIdx = component->Type == Nova::CameraType::Orthographic ? 0 : 1;
+    const auto &currentCameraTypeData = cameraTypes[currentCameraTypeIdx];
+    if (ImGui::BeginCombo(std::format("Camera type##{}", (int)entity).c_str(), currentCameraTypeData.second))
+    {
+        for (int i = 0; i < cameraTypes.size(); i++)
+        {
+            const auto &cameraTypeData = cameraTypes[i];
+            auto isSelected = component->Type == cameraTypeData.first;
+            if (ImGui::Selectable(std::format("{}##CameraType{}", cameraTypeData.second, (int)entity).c_str(), &isSelected))
+                component->Type = cameraTypeData.first;
+        }
+
+        ImGui::EndCombo();
+    }
+
+    if (component->Type == Nova::CameraType::Perspective)
+    {
+        auto cameraFOV = glm::degrees(component->Data.Perspective.FOV);
+        ImGui::DragFloat("FOV", &cameraFOV, 1.0f, 0.1f, 179.9f);
+
+        component->Data.Perspective.FOV = glm::radians(cameraFOV);
+
+        ImGui::DragFloat("Aspect ratio", &component->Data.Perspective.AspectRatio, 0.01f, 0.1f);
+        ImGui::DragFloat("Z-Near", &component->Data.Perspective.ZNear, 0.01f, 0.0001f);
+        ImGui::DragFloat("Z-Far", &component->Data.Perspective.ZFar, 0.01f, component->Data.Perspective.ZNear);
+    }
+    else
+    {
+        ImGui::DragFloat("Left", &component->Data.Ortho.Left, 0.01f);
+        ImGui::DragFloat("Right", &component->Data.Ortho.Right, 0.01f);
+        ImGui::DragFloat("Bottom", &component->Data.Ortho.Bottom, 0.01f);
+        ImGui::DragFloat("Top", &component->Data.Ortho.Top, 0.01f);
+    }
+}
+
+static void AddPointLightComponentInspector(entt::registry &scene, entt::entity entity) noexcept
+{
+    auto component = scene.try_get<Nova::PointLightComponent>(entity);
+    if (!component)
+        return;
+
+    ImGui::SeparatorText("Point light");
+
+    ImGui::ColorEdit3("Color", glm::value_ptr(component->Color));
+    ImGui::DragFloat("Intensity", &component->Intensity, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat("Radius", &component->Radius, 0.01f, 0.0f);
+}
+
+static void AddTransformComponentInspector(entt::registry &scene, entt::entity entity) noexcept
+{
+    auto component = scene.try_get<Nova::TransformComponent>(entity);
+    if (!component)
+        return;
+
+    ImGui::SeparatorText("Transform");
+
+    ImGui::DragFloat3("Position", glm::value_ptr(component->Position), 0.01f);
+    ImGui::DragFloat3("Scale", glm::value_ptr(component->Scale), 0.01f);
+
+    auto rotationDegrees = glm::degrees(component->Rotation);
+    ImGui::DragFloat3("Rotation", glm::value_ptr(rotationDegrees), 0.01f, 0.0f, 360.0f);
+
+    component->Rotation = glm::radians(rotationDegrees);
 }
 
 MainLayer::MainLayer()
@@ -226,20 +313,20 @@ MainLayer::MainLayer()
     // initialize main camera
     mainCameraEntity_ = entities_.create();
     entities_.emplace<NameComponent>(mainCameraEntity_, "MainCamera");
-    entities_.emplace<CameraComponent>(
+    entities_.emplace<Nova::CameraComponent>(
         mainCameraEntity_,
-        CameraComponent::CreatePerspective(
+        Nova::CameraComponent::CreatePerspective(
             glm::radians(45.0f),
             Nova::Window::GetAspectRatio(),
             0.1f,
             3.0f));
-    entities_.emplace<TransformComponent>(
+    entities_.emplace<Nova::TransformComponent>(
         mainCameraEntity_,
-        TransformComponent{
+        Nova::TransformComponent{
             .Position = {0.0f, 0.0f, 0.0f}});
-    entities_.emplace<PointLightComponent>(
+    entities_.emplace<Nova::PointLightComponent>(
         mainCameraEntity_,
-        PointLightComponent{
+        Nova::PointLightComponent{
             .Color = {1.0f, 1.0f, 0.6f},
             .Intensity = 0.9f,
             .Radius = 0.7f});
@@ -249,69 +336,69 @@ MainLayer::MainLayer()
     // initialize lights
     auto light1 = entities_.create();
     entities_.emplace<NameComponent>(light1, "Point light 1");
-    entities_.emplace<PointLightComponent>(
+    entities_.emplace<Nova::PointLightComponent>(
         light1,
-        PointLightComponent{
+        Nova::PointLightComponent{
             .Color = {1.0f, 0.09f, 0.985f},
             .Intensity = 0.4f,
             .Radius = 0.2f,
         });
-    entities_.emplace<TransformComponent>(
+    entities_.emplace<Nova::TransformComponent>(
         light1,
-        TransformComponent{
+        Nova::TransformComponent{
             .Position = {0.5f, 0.0f, -1.3f},
         });
 
     auto light2 = entities_.create();
     entities_.emplace<NameComponent>(light2, "Point light 2");
-    entities_.emplace<PointLightComponent>(
+    entities_.emplace<Nova::PointLightComponent>(
         light2,
-        PointLightComponent{
+        Nova::PointLightComponent{
             .Color = {1.0f, 0.5f, 0.03f},
             .Intensity = 0.4f,
             .Radius = 0.2f,
         });
-    entities_.emplace<TransformComponent>(
+    entities_.emplace<Nova::TransformComponent>(
         light2,
-        TransformComponent{
+        Nova::TransformComponent{
             .Position = {0.5f, 0.0f, -1.6f},
         });
 
     auto light3 = entities_.create();
     entities_.emplace<NameComponent>(light3, "Point light 3");
-    entities_.emplace<PointLightComponent>(
+    entities_.emplace<Nova::PointLightComponent>(
         light3,
-        PointLightComponent{
+        Nova::PointLightComponent{
             .Color = {1.0f, 0.5f, 0.8f},
             .Intensity = 0.4f,
             .Radius = 0.2f,
         });
-    entities_.emplace<TransformComponent>(
+    entities_.emplace<Nova::TransformComponent>(
         light3,
-        TransformComponent{
+        Nova::TransformComponent{
             .Position = {-0.2f, 0.0f, -1.3f},
         });
 
     auto light4 = entities_.create();
     entities_.emplace<NameComponent>(light4, "Point light 4");
-    entities_.emplace<PointLightComponent>(
+    entities_.emplace<Nova::PointLightComponent>(
         light4,
-        PointLightComponent{
+        Nova::PointLightComponent{
             .Color = {1.0f, 1.0f, 1.0f},
             .Intensity = 0.5f,
             .Radius = 0.6f,
         });
-    entities_.emplace<TransformComponent>(
+    entities_.emplace<Nova::TransformComponent>(
         light4,
-        TransformComponent{
+        Nova::TransformComponent{
             .Position = {0.0f, 1.5f, 0.0f},
         });
 
     auto dirLight = entities_.create();
     entities_.emplace<NameComponent>(dirLight, "Sunlight");
-    entities_.emplace<DirectionalLightComponent>(
+    entities_.emplace<Nova::DirectionalLightComponent>(
         dirLight,
-        DirectionalLightComponent{
+        Nova::DirectionalLightComponent{
             .Color = {1.0f, 1.0f, 1.0f},
             .Intensity = 0.2f,
             .Direction = {0.5f, 0.0f, -1.0f},
@@ -366,19 +453,34 @@ void MainLayer::OnRender()
         const auto &name = nameComponent
                                ? nameComponent->Name
                                : std::format("Entity {}.", (uint32_t)entity);
-        if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+        const auto isSelected = selectedEntity_ == entity;
+        const auto flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_OpenOnArrow | (isSelected ? ImGuiTreeNodeFlags_Selected : 0);
+
+        const auto treeNodeOpen = ImGui::TreeNodeEx(name.c_str(), flags);
+
+        if (ImGui::IsItemClicked())
+            selectedEntity_ = entity;
+
+        if (treeNodeOpen)
         {
-            TryAddEntityComponentTreeNode<TransformComponent>(entities_, entity, "Transform");
-            TryAddEntityComponentTreeNode<DirectionalLightComponent>(entities_, entity, "Light (Directional)");
-            TryAddEntityComponentTreeNode<PointLightComponent>(entities_, entity, "Light (Point)");
-            TryAddEntityComponentTreeNode<CameraComponent>(entities_, entity, "Camera");
-            TryAddEntityComponentTreeNode<CPPScriptComponent>(entities_, entity, "Script");
+            TryAddEntityComponentTreeNode<Nova::TransformComponent>(entities_, entity, "Transform", isSelected);
+            TryAddEntityComponentTreeNode<Nova::DirectionalLightComponent>(entities_, entity, "Light (Directional)", isSelected);
+            TryAddEntityComponentTreeNode<Nova::PointLightComponent>(entities_, entity, "Light (Point)", isSelected);
+            TryAddEntityComponentTreeNode<Nova::CameraComponent>(entities_, entity, "Camera", isSelected);
+            TryAddEntityComponentTreeNode<CPPScriptComponent>(entities_, entity, "Script", isSelected);
             ImGui::TreePop();
         }
     }
+    ImGui::End();
 
-    ImGui::ColorEdit3("Fog color", glm::value_ptr(fogColor_));
-    ImGui::SliderFloat("Fog intensity", &fogColor_.w, 0.0f, 1.0f);
+    ImGui::Begin("Inspector");
+    if (selectedEntity_ != (entt::entity)-1)
+    {
+        AddCameraComponentInspector(entities_, selectedEntity_);
+        AddDirectionalLightComponentInspector(entities_, selectedEntity_);
+        AddPointLightComponentInspector(entities_, selectedEntity_);
+        AddTransformComponentInspector(entities_, selectedEntity_);
+    }
     ImGui::End();
 
     ImGui::Begin("Assets");
@@ -478,8 +580,8 @@ void MainLayer::OnRender()
 
     Nova::Renderer::SetDisplaySize(viewportSize.x, viewportSize.y);
 
-    auto camera = entities_.try_get<CameraComponent>(mainCameraEntity_);
-    if (camera && camera->Type == CameraType::Perspective)
+    auto camera = entities_.try_get<Nova::CameraComponent>(mainCameraEntity_);
+    if (camera && camera->Type == Nova::CameraType::Perspective)
         camera->Data.Perspective.AspectRatio = viewportSize.x / viewportSize.y;
 
     ImGui::Image(

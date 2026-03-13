@@ -26,6 +26,7 @@ private:
 	std::shared_ptr<Nova::Image> modelIconImage_;
 	bool cursorCaptured_ = false;
 	entt::entity mainCameraEntity_ = (entt::entity)-1;
+	entt::entity selectedEntity_ = (entt::entity)-1;
 
-	glm::vec4 fogColor_ = {1.0f, 1.0f, 1.0f, 1.0f};
+	glm::vec4 fogColor_ = {1.0f, 1.0f, 1.0f, 0.0f};
 };
