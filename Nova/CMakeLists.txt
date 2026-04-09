@@ -17,6 +17,7 @@ target_link_libraries(
     dotnet
     xxHash
     uuid_v4
+    ktx
     nlohmann_json)
 target_compile_definitions(
     Nova
@@ -26,6 +27,7 @@ target_compile_definitions(
     "GLM_ENABLE_EXPERIMENTAL"
     "GLFW_INCLUDE_NONE"
     "NOMINMAX"
+    "KHRONOS_STATIC"
     PRIVATE
     "NV_BUILD")
 if(WIN32)
