@@ -29,3 +29,9 @@
 [submodule "vendor/entt"]
 	path = vendor/entt
 	url = https://github.com/skypjack/entt
+[submodule "vendor/ImGuizmo"]
+	path = vendor/ImGuizmo
+	url = https://github.com/CedricGuillemet/ImGuizmo
+[submodule "vendor/KTX-Software"]
+	path = vendor/KTX-Software
+	url = https://github.com/KhronosGroup/KTX-Software
