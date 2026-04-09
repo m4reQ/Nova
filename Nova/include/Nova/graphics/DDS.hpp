@@ -3,6 +3,8 @@
 
 namespace Nova
 {
+    constexpr auto DDSMagicNumber = 0x20534444ul;
+
     enum class DDSFourCC : uint32_t
     {
         DXT1 = 0x44585431,
@@ -186,17 +188,57 @@ namespace Nova
         AlphaModeCustom = 0x4,
     };
 
+    enum class DDSPixelFormatFlags : uint32_t
+    {
+        /// @brief Texture contains alpha data; dwRGBAlphaBitMask contains valid data.
+        AlphaPixels = 0x1,
+
+        /// @brief Used in some older DDS files for alpha channel only uncompressed data (RGBBitCount contains the alpha channel bitcount; ABitMask contains valid data)
+        Alpha = 0x2,
+
+        /// @brief FourCC contains valid data.
+        FourCC = 0x4,
+
+        /// @brief Texture contains uncompressed RGB data; RGBBitCount and the RGB masks (RBitMask, GBitMask, BBitMask) contain valid data.
+        RGB = 0x40,
+
+        /// @brief Used in some older DDS files for YUV uncompressed data (RGBBitCount contains the YUV bit count; RBitMask contains the Y mask, GBitMask contains the U mask, BBitMask contains the V mask)
+        YUV = 0x200,
+
+        /// @brief Used in some older DDS files for single channel color uncompressed data (RGBBitCount contains the luminance channel bit count; RBitMask contains the channel mask). Can be combined with AlphaPixels for a two channel DDS file.
+        Luminance = 0x20000
+    };
+
+    enum class DDSFourCC : uint32_t
+    {
+        DXT1 = 0x44585431,
+        DXT2 = 0x44585432,
+        DXT3 = 0x44585433,
+        DXT4 = 0x44585434,
+        DXT5 = 0x44585435,
+        DX10 = 0x44583130,
+    };
+
     // https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-pixelformat
     struct DDSPixelFormat
     {
         uint32_t Size;
-        uint32_t Flags;
-        uint32_t FourCC;
+        DDSPixelFormatFlags Flags;
+        DDSFourCC FourCC;
         uint32_t RGBBitCount;
         uint32_t RBitMask;
         uint32_t GBitMask;
         uint32_t BBitMask;
         uint32_t ABitMask;
+
+        constexpr bool HasFourCC() const noexcept { return IsFlagSet(Flags, DDSPixelFormatFlags::FourCC); }
+        constexpr bool IsCompressed() const noexcept { return HasFourCC(); }
+        constexpr bool IsDXT1() const noexcept { return FourCC == DDSFourCC::DXT1; }
+        constexpr bool IsDXT2() const noexcept { return FourCC == DDSFourCC::DXT2; }
+        constexpr bool IsDXT3() const noexcept { return FourCC == DDSFourCC::DXT3; }
+        constexpr bool IsDXT4() const noexcept { return FourCC == DDSFourCC::DXT4; }
+        constexpr bool IsDXT5() const noexcept { return FourCC == DDSFourCC::DXT5; }
+        constexpr bool IsDX10() const noexcept { return FourCC == DDSFourCC::DX10; }
     };
 
     // https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header-dxt10
@@ -226,6 +268,11 @@ namespace Nova
         uint32_t Caps3;
         uint32_t Caps4;
         uint32_t _Reserved2;
+
+        constexpr bool HasWidth() const noexcept { return IsFlagSet(Flags, DDSFlags::Width); }
+        constexpr bool HasHeight() const noexcept { return IsFlagSet(Flags, DDSFlags::Height); }
+        constexpr bool HasPixelFormat() const noexcept { return IsFlagSet(Flags, DDSFlags::PixelFormat); }
+        constexpr bool IsValid() const noexcept { return HasWidth() && HasHeight() && HasPixelFormat(); }
     };
 
     NV_DEFINE_BITWISE_OPERATORS(DDSFlags);
@@ -235,4 +282,6 @@ namespace Nova
     NV_DEFINE_BITWISE_OPERATORS(DDSMiscFlags);
 
     NV_DEFINE_BITWISE_OPERATORS(DDSMiscFlags2);
+
+    NV_DEFINE_BITWISE_OPERATORS(DDSPixelFormatFlags);
 }

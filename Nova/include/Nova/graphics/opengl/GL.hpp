@@ -10,6 +10,19 @@ namespace Nova
 {
     // TODO Add implicit casts to GLenum for strong typed enumerations
 
+    enum class WindingOrder : GLenum
+    {
+        Clockwise = GL_CW,
+        CounterClockwise = GL_CCW,
+    };
+
+    enum class Face : GLenum
+    {
+        Front = GL_FRONT,
+        Back = GL_BACK,
+        FrontAndBack = GL_FRONT_AND_BACK,
+    };
+
     enum class PixelFormat : GLenum
     {
         Red = GL_RED,
@@ -288,6 +301,10 @@ namespace Nova
         RGBA16UI = GL_RGBA16UI,
         RGBA32I = GL_RGBA32I,
         RGBA32UI = GL_RGBA32UI,
+        CompressedRGBS3TCDXT1 = GL_COMPRESSED_RGB_S3TC_DXT1_EXT,
+        CompressedRGBAS3TCDXT1 = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,
+        CompressedRGBAS3TCDXT3 = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT,
+        CompressedRGBAS3TCDXT5 = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT,
     };
 
     enum class Attachment : GLenum
@@ -458,7 +475,7 @@ namespace Nova
         DrawIndirectBuffer = GL_DRAW_INDIRECT_BUFFER,
         ElementArrayBuffer = GL_ELEMENT_ARRAY_BUFFER,
         PixelPackBuffer = GL_PIXEL_PACK_BUFFER,
-        PixelUnpackBUffer = GL_PIXEL_UNPACK_BUFFER,
+        PixelUnpackBuffer = GL_PIXEL_UNPACK_BUFFER,
         QueryBuffer = GL_QUERY_BUFFER,
         ShaderStorageBuffer = GL_SHADER_STORAGE_BUFFER,
         TextureBuffer = GL_TEXTURE_BUFFER,
@@ -1079,10 +1096,72 @@ namespace Nova
         }
 
         /// @brief Generate mipmaps for a specified texture object.
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glGenerateMipmap.xhtml
         /// @param texture Specifies the texture object name.
-        inline void GenerateTextureMipmap(GLuint texture)
+        inline void GenerateTextureMipmap(GLuint texture) noexcept
         {
             glGenerateTextureMipmap(texture);
+        }
+
+        /// @brief Define front- and back-facing polygons.
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glFrontFace.xhtml
+        /// @param mode Specifies the orientation of front-facing polygons.
+        inline void FrontFace(WindingOrder mode) noexcept
+        {
+            glFrontFace((GLenum)mode);
+        }
+
+        /// @brief Specify whether front- or back-facing facets can be culled.
+        ///
+        /// https://registry.khronos.org/OpenGL-Refpages/gl4/html/glCullFace.xhtml
+        /// @param mode Specifies whether front- or back-facing facets are candidates for culling.
+        inline void CullFace(Face mode) noexcept
+        {
+            glCullFace((GLenum)mode);
+        }
+
+        /// @brief FIX Undocumented
+        /// @param renderbuffer
+        inline void DeleteRenderbuffer(GLuint renderbuffer) noexcept
+        {
+            glDeleteRenderbuffers(1, &renderbuffer);
+        }
+
+        /// @brief FIX Undocumented
+        /// @param texture
+        inline void DeleteTexture(GLuint texture) noexcept
+        {
+            glDeleteTextures(1, &texture);
+        }
+
+        /// @brief FIX Undocumented
+        /// @return
+        inline GLuint CreateRenderbuffer() noexcept
+        {
+            GLuint id = 0;
+            glCreateRenderbuffers(1, &id);
+            return id;
+        }
+
+        /// @brief FIX Undocumented
+        /// @param renderbuffer
+        /// @param internalFormat
+        /// @param width
+        /// @param height
+        inline void NamedRenderbufferStorage(GLuint renderbuffer, InternalFormat internalFormat, GLsizei width, GLsizei height) noexcept
+        {
+            glNamedRenderbufferStorage(renderbuffer, (GLenum)internalFormat, width, height);
+        }
+
+        /// @brief FIX Undocumented
+        /// @param framebuffer
+        /// @param attachment
+        /// @param renderbuffer
+        inline void NamedFramebufferRenderbuffer(GLuint framebuffer, Attachment attachment, GLuint renderbuffer) noexcept
+        {
+            glNamedFramebufferRenderbuffer(framebuffer, (GLenum)attachment, GL_RENDERBUFFER, renderbuffer);
         }
     }
 
