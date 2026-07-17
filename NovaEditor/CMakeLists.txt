@@ -4,7 +4,7 @@ file(
     CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 add_executable(NovaEditor ${EDITOR_SOURCES})
-target_link_libraries(NovaEditor PRIVATE Nova imgui EnTT)
+target_link_libraries(NovaEditor PRIVATE Nova imgui imguizmo EnTT)
 set_target_properties(
     NovaEditor
     PROPERTIES
