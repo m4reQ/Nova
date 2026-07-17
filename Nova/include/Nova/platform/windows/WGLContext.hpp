@@ -1,4 +1,5 @@
 #pragma once
+#include <utility>
 #include <Windows.h>
 
 namespace Nova
@@ -21,12 +22,7 @@ namespace Nova
 
         constexpr HGLRC Get() const noexcept { return context_; }
 
-        constexpr HGLRC Reset() noexcept
-        {
-            auto old = context_;
-            context_ = nullptr;
-            return old;
-        }
+        constexpr HGLRC Reset() noexcept { return std::exchange(context_, nullptr); }
 
         WGLContext &operator=(const WGLContext &) = delete;
 

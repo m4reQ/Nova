@@ -1,5 +1,5 @@
 #pragma once
-#include <string_view>
+#include <utility>
 #include <Windows.h>
 
 namespace Nova
@@ -23,12 +23,7 @@ namespace Nova
 
         constexpr HDC Get() const noexcept { return context_; }
 
-        constexpr HDC Reset() noexcept
-        {
-            auto old = context_;
-            context_ = nullptr;
-            return old;
-        }
+        constexpr HDC Reset() noexcept { return std::exchange(context_, nullptr); }
 
         constexpr operator HDC() const noexcept { return Get(); }
 
