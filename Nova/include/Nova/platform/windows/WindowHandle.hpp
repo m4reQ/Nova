@@ -12,6 +12,8 @@ namespace Nova
 
         WindowHandle(const WindowHandle &) = delete;
 
+        WindowHandle(WindowHandle &&) noexcept = default;
+
         constexpr WindowHandle(HWND handle) noexcept
             : handle_(handle) {}
 
@@ -62,6 +64,8 @@ namespace Nova
         ~WindowHandle() noexcept;
 
         WindowHandle &operator=(const WindowHandle &) = delete;
+
+        WindowHandle &operator=(WindowHandle &&) noexcept = default;
 
         constexpr HWND Get() const noexcept { return handle_; }
 

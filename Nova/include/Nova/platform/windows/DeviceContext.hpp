@@ -17,9 +17,13 @@ namespace Nova
 
         DeviceContext(const DeviceContext &) = delete;
 
+        DeviceContext(DeviceContext &&) noexcept = default;
+
         ~DeviceContext() noexcept;
 
         DeviceContext &operator=(const DeviceContext &) = delete;
+
+        DeviceContext &operator=(DeviceContext &&) noexcept = default;
 
         constexpr HDC Get() const noexcept { return context_; }
 

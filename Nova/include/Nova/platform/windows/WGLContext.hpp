@@ -19,6 +19,8 @@ namespace Nova
 
         WGLContext(const WGLContext &) = delete;
 
+        WGLContext(WGLContext &&) noexcept = default;
+
         ~WGLContext() noexcept;
 
         void MakeCurrent(HDC deviceContext) const;
@@ -30,6 +32,8 @@ namespace Nova
         constexpr HGLRC Reset() noexcept { return std::exchange(context_, nullptr); }
 
         WGLContext &operator=(const WGLContext &) = delete;
+
+        WGLContext &operator=(WGLContext &&) noexcept = default;
 
         constexpr operator HGLRC() const noexcept { return Get(); }
 

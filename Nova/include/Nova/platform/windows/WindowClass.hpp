@@ -19,7 +19,11 @@ namespace Nova
 
         WindowClass(const WindowClass &) = delete;
 
+        WindowClass(WindowClass &&) noexcept = default;
+
         WindowClass &operator=(const WindowClass &) = delete;
+
+        WindowClass &operator=(WindowClass &&) noexcept = default;
 
         ~WindowClass() noexcept;
 
