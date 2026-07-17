@@ -8,9 +8,11 @@ add_library(Nova STATIC ${NOVA_SOURCES})
 target_link_libraries(
     Nova
     PUBLIC
+    opengl32
     EnTT
     glfw
     gl
+    wgl
     glm
     spdlog
     stb
