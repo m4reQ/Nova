@@ -1,15 +1,16 @@
 #pragma once
-#include <Windows.h>
+#include <Nova/platform/windows/DeviceContext.hpp>
+#include <Nova/platform/windows/WGLContext.hpp>
+#include <Nova/platform/windows/WindowClass.hpp>
+#include <Nova/platform/windows/WindowHandle.hpp>
 
 namespace Nova
 {
     struct WindowData
     {
-        HINSTANCE Instance;
-        HWND Window;
-        HICON Icon;
-        WINDOWPLACEMENT SavedPlacement;
-        DWORD OriginalStyle;
-        bool ShouldClose, IsFullscreen, IsVisible;
+        WindowClass wndClass;
+        WindowHandle handle;
+        DeviceContext deviceContext;
+        WGLContext wglContext;
     };
 }
