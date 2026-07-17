@@ -17,6 +17,8 @@ namespace Nova
 
         ~WGLContext() noexcept;
 
+        void MakeCurrent(HDC deviceContext) const;
+
         constexpr HGLRC Get() const noexcept { return context_; }
 
         constexpr HGLRC Reset() noexcept

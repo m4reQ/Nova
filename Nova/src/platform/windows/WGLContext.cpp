@@ -6,9 +6,6 @@ Nova::WGLContext::WGLContext(HDC deviceContext)
 {
     if (context_ == nullptr)
         throw std::runtime_error("Failed to create WGL context.");
-
-    if (!wglMakeCurrent(deviceContext, context_))
-        throw std::runtime_error("Failed to make WGL context current.");
 }
 
 Nova::WGLContext::~WGLContext() noexcept
@@ -20,4 +17,10 @@ Nova::WGLContext::~WGLContext() noexcept
 
         wglDeleteContext(context_);
     }
+}
+
+void Nova::WGLContext::MakeCurrent(HDC deviceContext) const
+{
+    if (!wglMakeCurrent(deviceContext, context_))
+        throw std::runtime_error("Failed to make WGL context current.");
 }
