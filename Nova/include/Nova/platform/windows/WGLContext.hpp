@@ -1,5 +1,6 @@
 #pragma once
 #include <utility>
+#include <span>
 #include <Windows.h>
 
 namespace Nova
@@ -11,6 +12,8 @@ namespace Nova
 
         WGLContext(HDC deviceContext);
 
+        WGLContext(HDC deviceContext, std::span<const int> attribs);
+
         constexpr WGLContext(HGLRC context)
             : context_(context) {}
 
@@ -19,6 +22,8 @@ namespace Nova
         ~WGLContext() noexcept;
 
         void MakeCurrent(HDC deviceContext) const;
+
+        void LoadModern(HDC deviceContext) const;
 
         constexpr HGLRC Get() const noexcept { return context_; }
 
