@@ -1,11 +1,12 @@
 #version 450 core
+#extension GL_ARB_bindless_texture : require
 
 in vec2 vsTexCoord;
 
 layout(location = 4) out vec4 outColor;
 
-layout(binding = 0) uniform sampler2D uSceneColor;
-layout(binding = 1) uniform sampler2D uDepth;
+layout(bindless_sampler) uniform sampler2D uSceneColor;
+layout(bindless_sampler) uniform sampler2D uDepth;
 uniform vec4 uFogColor; // rgb - color, a - density
 
 layout(std140) uniform uCameraData

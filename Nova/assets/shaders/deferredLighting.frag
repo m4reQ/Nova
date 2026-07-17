@@ -1,4 +1,5 @@
 #version 450 core
+#extension GL_ARB_bindless_texture : require
 
 struct PointLight
 {
@@ -17,9 +18,9 @@ layout(location=3) out vec4 outColor;
 
 in vec2 vsTexCoord;
 
-layout(binding=0) uniform sampler2D uGBufferAlbedoSpecular;
-layout(binding=1) uniform sampler2D uGBufferPosition;
-layout(binding=2) uniform sampler2D uGBufferNormal;
+layout(bindless_sampler) uniform sampler2D uGBufferAlbedoSpecular;
+layout(bindless_sampler) uniform sampler2D uGBufferPosition;
+layout(bindless_sampler) uniform sampler2D uGBufferNormal;
 uniform float uAmbient;
 uniform float uShininess;
 uniform uint uPointLightsCount;
