@@ -1,7 +1,5 @@
 #pragma once
-#include <Nova/input/Button.hpp>
-#include <Nova/input/Modifier.hpp>
-#include <Nova/input/Key.hpp>
+#include <Nova/core/Input.hpp>
 #include <Nova/graphics/Rect.hpp>
 #include <glm/vec2.hpp>
 #include <glfw/glfw3.h>
@@ -16,9 +14,11 @@ namespace Nova
 		WindowClose,
 		WindowFocus,
 		MouseMove,
-		MouseButton,
+		MouseButtonDown,
+		MouseButtonUp,
 		MouseScroll,
-		Key,
+		KeyDown,
+		KeyUp,
 		FileDrop,
 	};
 
@@ -36,21 +36,21 @@ namespace Nova
 	{
 	public:
 		WindowResizeEvent() = default;
-		
+
 		constexpr WindowResizeEvent(int width, int height) noexcept
-			: width_(width), height_(height) { }
+			: width_(width), height_(height) {}
 
 		EventType GetEventType() const noexcept override { return EventType::WindowResize; }
-		
+
 		const std::string_view GetName() const noexcept override { return "WindowResize"; }
 
 		constexpr int GetWidth() const noexcept { return width_; }
 
 		constexpr int GetHeight() const noexcept { return height_; }
 
-		constexpr glm::ivec2 GetSize() const noexcept { return glm::ivec2{ width_, height_ }; }
+		constexpr glm::ivec2 GetSize() const noexcept { return glm::ivec2{width_, height_}; }
 
-		constexpr Rect<int> GetRect() const noexcept { return Rect{ 0, 0, width_, height_ }; }
+		constexpr Rect<int> GetRect() const noexcept { return Rect{0, 0, width_, height_}; }
 
 	private:
 		int width_;
@@ -63,7 +63,7 @@ namespace Nova
 		WindowMoveEvent() = default;
 
 		constexpr WindowMoveEvent(int x, int y) noexcept
-			: x_(x), y_(y) { }
+			: x_(x), y_(y) {}
 
 		EventType GetEventType() const noexcept override { return EventType::WindowMove; }
 
@@ -73,7 +73,7 @@ namespace Nova
 
 		constexpr int GetY() const noexcept { return y_; }
 
-		constexpr glm::ivec2 GetPosition() const noexcept { return glm::ivec2{ x_, y_ }; }
+		constexpr glm::ivec2 GetPosition() const noexcept { return glm::ivec2{x_, y_}; }
 
 	private:
 		int x_;
@@ -86,13 +86,14 @@ namespace Nova
 		WindowCloseEvent() = default;
 
 		constexpr WindowCloseEvent(double time) noexcept
-			: time_(time) { }
+			: time_(time) {}
 
 		EventType GetEventType() const noexcept override { return EventType::WindowClose; }
 
 		const std::string_view GetName() const noexcept override { return "WindowClose"; }
 
 		constexpr double GetTime() const noexcept { return time_; }
+
 	private:
 		double time_;
 	};
@@ -103,7 +104,7 @@ namespace Nova
 		WindowFocusEvent() = default;
 
 		constexpr WindowFocusEvent(bool isFocused) noexcept
-			: isFocused_(isFocused) { }
+			: isFocused_(isFocused) {}
 
 		EventType GetEventType() const noexcept override { return EventType::WindowFocus; }
 
@@ -120,8 +121,8 @@ namespace Nova
 	public:
 		MouseMoveEvent() = default;
 
-		constexpr MouseMoveEvent(double x, double y, double lastX, double lastY) noexcept
-			: x_(x), y_(y), lastX_(lastX), lastY_(lastY) { }
+		constexpr MouseMoveEvent(double x, double y, double deltaX, double deltaY) noexcept
+			: x_(x), y_(y), deltaX_(deltaX), deltaY_(deltaY) {}
 
 		EventType GetEventType() const noexcept override { return EventType::MouseMove; }
 
@@ -131,53 +132,55 @@ namespace Nova
 
 		constexpr double GetY() const noexcept { return y_; }
 
-		constexpr double GetLastX() const noexcept { return lastX_; }
+		constexpr glm::dvec2 GetPosition() const noexcept { return glm::dvec2{x_, y_}; }
 
-		constexpr double GetLastY() const noexcept { return lastY_; }
+		constexpr double GetDeltaX() const noexcept { return deltaX_; }
 
-		constexpr double GetDeltaX() const noexcept { return lastX_ - x_; }
+		constexpr double GetDeltaY() const noexcept { return deltaX_; }
 
-		constexpr double GetDeltaY() const noexcept { return lastY_ - y_; }
-		
-		constexpr glm::dvec2 GetPosition() const noexcept { return glm::dvec2{ x_, y_ }; }
-
-		constexpr glm::dvec2 GetLastPosition() const noexcept { return glm::dvec2{ lastX_, lastY_ }; }
-
-		constexpr glm::dvec2 GetDelta() const noexcept { return glm::dvec2{ GetDeltaX(), GetDeltaY() }; }
+		constexpr glm::dvec2 GetDelta() const noexcept { return glm::dvec2{deltaX_, deltaY_}; }
 
 	private:
 		double x_;
 		double y_;
-		double lastX_;
-		double lastY_;
+		double deltaX_;
+		double deltaY_;
 	};
 
-	class MouseButtonEvent final : public Event
+	class MouseButtonDownEvent final : public Event
 	{
 	public:
-		MouseButtonEvent() = default;
+		MouseButtonDownEvent() = default;
 
-		constexpr MouseButtonEvent(Button button, bool isPressed, Modifier modifiers) noexcept
-			: button_(button), isPressed_(isPressed), modifiers_(modifiers) { }
+		constexpr MouseButtonDownEvent(Button button) noexcept
+			: button_(button) {}
 
-		EventType GetEventType() const noexcept override { return EventType::MouseButton; }
+		EventType GetEventType() const noexcept override { return EventType::MouseButtonDown; }
 
-		const std::string_view GetName() const noexcept override { return "MouseButton"; }
+		const std::string_view GetName() const noexcept override { return "MouseButtonDown"; }
 
 		constexpr Button GetButton() const noexcept { return button_; }
-		
-		constexpr bool IsPressed() const noexcept { return isPressed_; }
-		
-		constexpr bool IsReleased() const noexcept { return !isPressed_; }
-
-		constexpr Modifier GetModifiers() const noexcept { return modifiers_; }
-
-		constexpr bool IsModifierActive(Modifier mod) const noexcept { return ((int)modifiers_ & (int)mod) == (int)mod; }
 
 	private:
 		Button button_;
-		Modifier modifiers_;
-		bool isPressed_;
+	};
+
+	class MouseButtonUpEvent final : public Event
+	{
+	public:
+		MouseButtonUpEvent() = default;
+
+		constexpr MouseButtonUpEvent(Button button) noexcept
+			: button_(button) {}
+
+		EventType GetEventType() const noexcept override { return EventType::MouseButtonUp; }
+
+		const std::string_view GetName() const noexcept override { return "MouseButtonUp"; }
+
+		constexpr Button GetButton() const noexcept { return button_; }
+
+	private:
+		Button button_;
 	};
 
 	class MouseScrollEvent final : public Event
@@ -186,7 +189,7 @@ namespace Nova
 		MouseScrollEvent() = default;
 
 		constexpr MouseScrollEvent(double v, double h) noexcept
-			: v_(v), h_(h) { }
+			: v_(v), h_(h) {}
 
 		EventType GetEventType() const noexcept override { return EventType::MouseScroll; }
 
@@ -201,34 +204,44 @@ namespace Nova
 		double h_;
 	};
 
-	class KeyEvent final : public Event
+	class KeyDownEvent final : public Event
 	{
 	public:
-		KeyEvent() = default;
+		KeyDownEvent() = default;
 
-		constexpr KeyEvent(Key key, int action, Modifier mods) noexcept
-			: key_(key), action_(action), mods_(mods) { }
+		constexpr KeyDownEvent(Key key, bool isRepeated) noexcept
+			: key_(key),
+			  isRepeated_(isRepeated) {}
 
-		EventType GetEventType() const noexcept override { return EventType::Key; }
+		EventType GetEventType() const noexcept override { return EventType::KeyDown; }
 
-		const std::string_view GetName() const noexcept override { return "Key"; }
+		const std::string_view GetName() const noexcept override { return "KeyDown"; }
 
 		constexpr Key GetKey() const noexcept { return key_; }
-		
-		constexpr bool IsPressed() const noexcept { return action_ == GLFW_PRESS; }
-		
-		constexpr bool IsReleased() const noexcept { return action_ == GLFW_RELEASE; }
-		
-		constexpr bool IsRepeated() const noexcept { return action_ == GLFW_REPEAT; }
-		
-		constexpr Modifier GetModifiers() const noexcept { return mods_; }
-		
-		constexpr bool IsModifierActive(Modifier mod) const noexcept { return ((int)mods_ & (int)mod) == (int)mod; }
+
+		constexpr bool IsRepeated() const noexcept { return isRepeated_; }
 
 	private:
 		Key key_;
-		Modifier mods_;
-		int action_;
+		bool isRepeated_;
+	};
+
+	class KeyUpEvent final : public Event
+	{
+	public:
+		KeyUpEvent() = default;
+
+		constexpr KeyUpEvent(Key key) noexcept
+			: key_(key) {}
+
+		EventType GetEventType() const noexcept override { return EventType::KeyUp; }
+
+		const std::string_view GetName() const noexcept override { return "KeyUp"; }
+
+		constexpr Key GetKey() const noexcept { return key_; }
+
+	private:
+		Key key_;
 	};
 
 	class FileDropEvent final : public Event
@@ -236,11 +249,11 @@ namespace Nova
 	public:
 		FileDropEvent() = default;
 
-		constexpr FileDropEvent(const std::span<const char*> paths) noexcept
-			: paths_(paths) { }
+		constexpr FileDropEvent(const std::span<const char *> paths) noexcept
+			: paths_(paths) {}
 
-		constexpr FileDropEvent(int pathsCount, const char* paths[]) noexcept
-			: paths_(paths, pathsCount) { }
+		constexpr FileDropEvent(int pathsCount, const char *paths[]) noexcept
+			: paths_(paths, pathsCount) {}
 
 		EventType GetEventType() const noexcept override { return EventType::FileDrop; }
 
@@ -248,11 +261,11 @@ namespace Nova
 
 		constexpr size_t GetPathsCount() const noexcept { return paths_.size(); }
 
-		constexpr std::span<const char*> GetPaths() const noexcept { return paths_; }
+		constexpr std::span<const char *> GetPaths() const noexcept { return paths_; }
 
 		constexpr const std::string_view GetPath(size_t index) const noexcept { return paths_[index]; }
 
 	private:
-		std::span<const char*> paths_;
+		std::span<const char *> paths_;
 	};
 }
