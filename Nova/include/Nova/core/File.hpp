@@ -17,15 +17,9 @@ namespace Nova
 	class File
 	{
 	public:
-		static std::pair<std::unique_ptr<uint8_t[]>, size_t> ReadWhole(
-			const std::filesystem::path &filepath,
-			const std::string_view mode);
+		static std::vector<char> ReadWholeText(const std::filesystem::path &filepath);
 
-		static std::pair<std::unique_ptr<char[]>, size_t> ReadWholeText(
-			const std::filesystem::path &filepath);
-
-		static std::pair<std::unique_ptr<uint8_t[]>, size_t> ReadWholeBinary(
-			const std::filesystem::path &filepath);
+		static std::vector<std::byte> ReadWholeBinary(const std::filesystem::path &filepath);
 
 		File() noexcept = default;
 
@@ -47,6 +41,10 @@ namespace Nova
 
 		template <typename T>
 		size_t ReadChecked(T *data, size_t elementsCount = 1) { return ReadChecked(data, sizeof(T), elementsCount); }
+
+		std::vector<std::byte> ReadToEndBinary() const noexcept;
+
+		std::vector<char> ReadToEndText() const noexcept;
 
 		bool GetLine(std::string &out) const;
 

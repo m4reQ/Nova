@@ -4,55 +4,61 @@
 
 using namespace Nova;
 
-std::pair<std::unique_ptr<uint8_t[]>, size_t> File::ReadWhole(
-	const std::filesystem::path &filepath,
-	const std::string_view mode)
+constexpr size_t c_ReadChunkSize = 4096;
+
+template <typename T>
+static std::vector<T> ReadFileToEnd(FILE *file) noexcept
 {
-	NV_PROFILE_FUNC;
-
-	constexpr size_t c_ReadChunkSize = 4096;
-
-	FILE *file = fopen(filepath.string().c_str(), mode.data());
-	if (file == nullptr)
-		throw std::runtime_error("Failed to open file.");
-
-	auto data = std::make_unique<uint8_t[]>(c_ReadChunkSize);
-	size_t bufferSize = c_ReadChunkSize;
+	std::vector<T> buffer(c_ReadChunkSize);
 	size_t dataSize = 0;
 	while (true)
 	{
-		NV_PROFILE_SCOPE("::ReadFileChunk");
-
-		size_t bytesRead = fread(&data[dataSize], sizeof(std::byte), c_ReadChunkSize, file);
+		size_t bytesRead = fread(
+			&buffer[dataSize],
+			sizeof(T),
+			c_ReadChunkSize,
+			file);
 		dataSize += bytesRead;
 
 		if (bytesRead < c_ReadChunkSize)
 			break;
 
-		{
-			NV_PROFILE_SCOPE("::ReallocateChunk");
-			auto newData = std::make_unique<uint8_t[]>(dataSize + c_ReadChunkSize);
-			std::memcpy(newData.get(), data.get(), dataSize);
-			data = std::move(newData);
-		}
+		buffer.resize(buffer.size() + c_ReadChunkSize);
 	}
+
+	buffer.resize(dataSize);
+
+	return buffer;
+}
+
+std::vector<char> File::ReadWholeText(const std::filesystem::path &filepath)
+{
+	NV_PROFILE_FUNC;
+
+	FILE *file = fopen(filepath.string().c_str(), "r");
+	if (file == nullptr)
+		throw std::runtime_error("Failed to open file.");
+
+	const auto result = ReadFileToEnd<char>(file);
 
 	fclose(file);
 
-	return std::make_pair(std::move(data), dataSize);
+	return result;
 }
 
-std::pair<std::unique_ptr<char[]>, size_t> File::ReadWholeText(
-	const std::filesystem::path &filepath)
+std::vector<std::byte> File::ReadWholeBinary(const std::filesystem::path &filepath)
 {
-	auto [data, size] = ReadWhole(filepath, "rS");
-	return std::make_pair(unique_ptr_cast<char[]>(std::move(data)), size);
-}
+	NV_PROFILE_FUNC;
 
-std::pair<std::unique_ptr<uint8_t[]>, size_t> File::ReadWholeBinary(
-	const std::filesystem::path &filepath)
-{
-	return ReadWhole(filepath, "rbS");
+	FILE *file = fopen(filepath.string().c_str(), "rb");
+	if (file == nullptr)
+		throw std::runtime_error("Failed to open file.");
+
+	const auto result = ReadFileToEnd<std::byte>(file);
+
+	fclose(file);
+
+	return result;
 }
 
 File::File(const std::string_view filepath, const std::string_view mode)
@@ -82,6 +88,16 @@ size_t File::ReadChecked(void *data, size_t elementSize, size_t elementsCount) c
 		throw std::runtime_error("Failed to read file");
 
 	return readSize;
+}
+
+std::vector<std::byte> File::ReadToEndBinary() const noexcept
+{
+	return ReadFileToEnd<std::byte>(file_);
+}
+
+std::vector<char> File::ReadToEndText() const noexcept
+{
+	return ReadFileToEnd<char>(file_);
 }
 
 int File::Seek(long offset, FileSeekOrigin origin)
