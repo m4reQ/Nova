@@ -1,5 +1,5 @@
 #pragma once
-#include <utility>
+#include <Nova/utils/AutoRelease.hpp>
 #include <string_view>
 #include <Windows.h>
 
@@ -10,12 +10,9 @@ namespace Nova
     public:
         WindowHandle() = default;
 
-        WindowHandle(const WindowHandle &) = delete;
-
         WindowHandle(WindowHandle &&) noexcept = default;
 
-        constexpr WindowHandle(HWND handle) noexcept
-            : handle_(handle) {}
+        WindowHandle(HWND handle) noexcept;
 
         WindowHandle(
             DWORD exStyle,
@@ -61,19 +58,15 @@ namespace Nova
             int height,
             HINSTANCE hInstance);
 
-        ~WindowHandle() noexcept;
-
-        WindowHandle &operator=(const WindowHandle &) = delete;
-
         WindowHandle &operator=(WindowHandle &&) noexcept = default;
 
-        constexpr HWND Get() const noexcept { return handle_; }
+        constexpr HWND Get() const noexcept { return handle_.Get(); }
 
-        constexpr HWND Reset() noexcept { return std::exchange(handle_, nullptr); }
+        constexpr HWND Reset() noexcept { return handle_.Reset(); }
 
         constexpr operator HWND() const noexcept { return Get(); }
 
     private:
-        HWND handle_ = nullptr;
+        AutoRelease<HWND> handle_;
     };
 }

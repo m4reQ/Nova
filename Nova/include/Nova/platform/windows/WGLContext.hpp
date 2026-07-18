@@ -1,4 +1,5 @@
 #pragma once
+#include <Nova/utils/AutoRelease.hpp>
 #include <utility>
 #include <span>
 #include <Windows.h>
@@ -14,30 +15,23 @@ namespace Nova
 
         WGLContext(HDC deviceContext, std::span<const int> attribs);
 
-        constexpr WGLContext(HGLRC context)
-            : context_(context) {}
-
-        WGLContext(const WGLContext &) = delete;
+        WGLContext(HGLRC context) noexcept;
 
         WGLContext(WGLContext &&) noexcept = default;
-
-        ~WGLContext() noexcept;
 
         void MakeCurrent(HDC deviceContext) const;
 
         void LoadModern(HDC deviceContext) const;
 
-        constexpr HGLRC Get() const noexcept { return context_; }
+        constexpr HGLRC Get() const noexcept { return context_.Get(); }
 
-        constexpr HGLRC Reset() noexcept { return std::exchange(context_, nullptr); }
-
-        WGLContext &operator=(const WGLContext &) = delete;
-
-        WGLContext &operator=(WGLContext &&) noexcept = default;
+        constexpr HGLRC Reset() noexcept { return context_.Reset(); }
 
         constexpr operator HGLRC() const noexcept { return Get(); }
 
+        WGLContext &operator=(WGLContext &&) noexcept = default;
+
     private:
-        HGLRC context_ = nullptr;
+        AutoRelease<HGLRC> context_;
     };
 }

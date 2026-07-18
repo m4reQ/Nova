@@ -1,6 +1,15 @@
 #include <Nova/platform/windows/WindowHandle.hpp>
 #include <stdexcept>
 
+Nova::WindowHandle::WindowHandle(HWND handle) noexcept
+    : handle_(
+          handle,
+          [](auto x)
+          {
+              if (x != nullptr)
+                  DestroyWindow(x);
+          }) {}
+
 Nova::WindowHandle::WindowHandle(
     DWORD exStyle,
     const std::string_view className,
@@ -11,7 +20,7 @@ Nova::WindowHandle::WindowHandle(
     int width,
     int height,
     HINSTANCE hInstance)
-    : handle_(
+    : WindowHandle(
           CreateWindowExA(
               exStyle,
               className.data(),
@@ -61,7 +70,7 @@ Nova::WindowHandle::WindowHandle(
     int width,
     int height,
     HINSTANCE hInstance)
-    : handle_(
+    : WindowHandle(
           CreateWindowExW(
               exStyle,
               className.data(),
@@ -100,9 +109,3 @@ Nova::WindowHandle::WindowHandle(
           width,
           height,
           hInstance) {}
-
-Nova::WindowHandle::~WindowHandle() noexcept
-{
-    if (handle_ != nullptr)
-        DestroyWindow(handle_);
-}

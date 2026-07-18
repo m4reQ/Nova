@@ -1,5 +1,5 @@
 #pragma once
-#include <utility>
+#include <Nova/utils/AutoRelease.hpp>
 #include <span>
 #include <Windows.h>
 
@@ -10,28 +10,21 @@ namespace Nova
     public:
         Bitmap() = default;
 
-        Bitmap(const Bitmap &) = delete;
-
         Bitmap(Bitmap &&) noexcept = default;
 
-        constexpr Bitmap(HBITMAP handle) noexcept
-            : handle_(handle) {}
+        Bitmap(HBITMAP handle) noexcept;
 
         Bitmap(int width, int height, UINT planes, UINT bitCount, std::span<const std::byte> bits);
 
-        ~Bitmap() noexcept;
+        constexpr HBITMAP Get() const noexcept { return handle_.Get(); }
 
-        constexpr HBITMAP Get() const noexcept { return handle_; }
-
-        constexpr HBITMAP Reset() noexcept { return std::exchange(handle_, nullptr); }
+        constexpr HBITMAP Reset() noexcept { return handle_.Reset(); }
 
         constexpr operator HBITMAP() const noexcept { return Get(); }
-
-        constexpr Bitmap &operator=(const Bitmap &) = delete;
 
         constexpr Bitmap &operator=(Bitmap &&) noexcept = default;
 
     private:
-        HBITMAP handle_ = nullptr;
+        AutoRelease<HBITMAP> handle_;
     };
 }

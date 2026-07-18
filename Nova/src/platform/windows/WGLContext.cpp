@@ -2,34 +2,37 @@
 #include <glad/wgl.h>
 #include <stdexcept>
 
+Nova::WGLContext::WGLContext(HGLRC context) noexcept
+    : context_(
+          context,
+          [](auto x)
+          {
+              if (x != nullptr)
+              {
+                  if (wglGetCurrentContext() == x)
+                      wglMakeCurrent(wglGetCurrentDC(), nullptr);
+
+                  wglDeleteContext(x);
+              }
+          }) {}
+
 Nova::WGLContext::WGLContext(HDC deviceContext)
-    : context_(wglCreateContext(deviceContext))
+    : WGLContext(wglCreateContext(deviceContext))
 {
     if (context_ == nullptr)
         throw std::runtime_error("Failed to create WGL context.");
 }
 
 Nova::WGLContext::WGLContext(HDC deviceContext, std::span<const int> attribs)
-    : context_(wglCreateContextAttribsARB(deviceContext, nullptr, attribs.data()))
+    : WGLContext(wglCreateContextAttribsARB(deviceContext, nullptr, attribs.data()))
 {
     if (context_ == nullptr)
         throw std::runtime_error("Failed to create modern WGL context.");
 }
 
-Nova::WGLContext::~WGLContext() noexcept
-{
-    if (context_ != nullptr)
-    {
-        if (wglGetCurrentContext() == context_)
-            wglMakeCurrent(wglGetCurrentDC(), nullptr);
-
-        wglDeleteContext(context_);
-    }
-}
-
 void Nova::WGLContext::MakeCurrent(HDC deviceContext) const
 {
-    if (!wglMakeCurrent(deviceContext, context_))
+    if (!wglMakeCurrent(deviceContext, context_.Get()))
         throw std::runtime_error("Failed to make WGL context current.");
 }
 
