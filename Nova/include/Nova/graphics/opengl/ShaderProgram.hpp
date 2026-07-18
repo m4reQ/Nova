@@ -29,11 +29,11 @@ namespace Nova
 
 		static ShaderProgram FromBinary(
 			GLenum binaryFormat,
-			const std::span<uint8_t> binary);
+			const std::span<std::byte> binary);
 
 		static ShaderProgram FromBinary(
 			GLenum binaryFormat,
-			const uint8_t *binary,
+			const std::byte *binary,
 			size_t binarySize);
 
 		static ShaderProgram FromBinary(
@@ -81,6 +81,8 @@ namespace Nova
 		void SetUniform(const std::string_view name, const glm::vec3 &value) const;
 
 		void SetUniform(const std::string_view name, const glm::vec2 &value) const;
+
+		void SetUniform(const std::string_view name, GLuint64 value) const;
 
 		GLuint GetResourceLocation(const std::string_view name) const;
 
