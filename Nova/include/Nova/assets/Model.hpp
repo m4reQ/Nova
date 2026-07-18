@@ -8,34 +8,21 @@
 
 namespace Nova
 {
-	struct ModelVertex
-	{
-		glm::vec3 Position;
-		glm::vec3 Normal;
-		glm::vec2 TextureCoords;
-	};
-
-	struct ModelLoadingData
-	{
-		std::vector<ModelVertex> ModelVertices;
-		std::vector<uint32_t> ModelIndices;
-	};
 
 	class Model : public Asset
 	{
 	public:
+		Model() = default;
+
+		Model(const AssetSource &source, std::optional<std::string_view> name = std::nullopt) noexcept;
+
 		constexpr static AssetType GetStaticAssetType() noexcept { return AssetType::Model; }
-		using Asset::Asset;
 
-		void Load(void *loadingData) override;
+		constexpr AssetType GetType() const noexcept override { return AssetType::Model; }
 
-		void PostLoad(void *loadingData) override;
+		constexpr void SetModelBuffer(Buffer &&buffer) noexcept { modelBuffer_ = std::move(buffer); }
 
-		void *CreateLoadingData() const noexcept override { return new ModelLoadingData(); }
-
-		void FreeLoadingData(void *loadingData) const override { delete static_cast<ModelLoadingData *>(loadingData); }
-
-		constexpr bool RequiresPostLoad() const noexcept override { return true; }
+		constexpr void SetIndexBuffer(Buffer &&buffer) noexcept { indexBuffer_ = std::move(buffer); }
 
 		constexpr const Buffer &GetModelDataBuffer() const noexcept { return modelBuffer_; }
 

@@ -1,27 +1,20 @@
 #pragma once
-#include <Nova/core/Utility.hpp>
+#include <Nova/core/Flag.hpp>
+#include <uuid_v4.h>
 #include <atomic>
 #include <string_view>
 #include <optional>
 #include <filesystem>
 #include <mutex>
-#include <uuid_v4.h>
+#include <variant>
+#include <span>
 
 namespace Nova
 {
-    enum class AssetSourceType
-    {
-        File,
-        Memory,
-    };
-
-    struct AssetSource
-    {
-        AssetSourceType Type;
-        std::filesystem::path Filepath;
-
-        static AssetSource Memory() noexcept { return AssetSource{.Type = AssetSourceType::Memory}; }
-    };
+    using AssetSource = std::variant<
+        std::filesystem::path,
+        std::vector<std::filesystem::path>,
+        std::span<const uint8_t>>;
 
     enum class AssetStatus
     {
@@ -51,31 +44,13 @@ namespace Nova
     public:
         Asset() = default;
 
-        Asset(
-            const AssetSource &source,
-            AssetType type,
-            std::optional<std::string_view> name = std::nullopt,
-            AssetFlags flags = AssetFlags::None);
+        Asset(const AssetSource &source, std::optional<std::string_view> name = std::nullopt) noexcept;
 
-        virtual ~Asset() noexcept {};
-
-        virtual void PreLoad(void *loadingData) {}
-
-        virtual void Load(void *loadingData) {}
-
-        virtual void PostLoad(void *loadingData) {}
+        virtual ~Asset() noexcept = default;
 
         virtual void Unload() {}
 
-        virtual void *CreateLoadingData() const = 0;
-
-        virtual void FreeLoadingData(void *loadingData) const = 0;
-
-        virtual bool RequiresPostLoad() const noexcept { return false; }
-
-        virtual bool RequiresPreLoad() const noexcept { return false; }
-
-        constexpr AssetType GetType() const noexcept { return type_; }
+        virtual AssetType GetType() const noexcept = 0;
 
         constexpr const AssetSource &GetSource() const noexcept { return source_; }
 
@@ -85,7 +60,7 @@ namespace Nova
 
         constexpr const UUIDv4::UUID &GetUUID() const noexcept { return uuid_; }
 
-        constexpr bool IsInternal() const noexcept { return IsFlagSet(flags_, AssetFlags::Internal); }
+        constexpr bool IsInternal() const noexcept { return Flag::IsSet(flags_, AssetFlags::Internal); }
 
         bool CheckStatus(AssetStatus status) const noexcept { return status_.load() == status; }
 
@@ -99,10 +74,10 @@ namespace Nova
         std::mutex loadingMutex_;
         UUIDv4::UUID uuid_;
         AssetType type_;
-        AssetFlags flags_;
         std::optional<std::string> name_;
-        AssetSource source_ = AssetSource::Memory();
+        AssetSource source_;
         std::atomic<AssetStatus> status_ = AssetStatus::Loading;
+        AssetFlags flags_;
     };
 
     NV_DEFINE_BITWISE_OPERATORS(AssetFlags);

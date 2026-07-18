@@ -10,76 +10,25 @@
 
 using namespace Nova;
 
-enum class AssetLoadingState
-{
-    Loaded,
-    Failed,
-};
-
-struct AssetLoadingTask
-{
-    std::future<void> LoadingFuture;
-    std::shared_ptr<Asset> Asset;
-    void *LoadingData;
-    AssetLoadingState LoadingState;
-};
-
 std::unordered_map<UUIDv4::UUID, std::shared_ptr<Asset>> assetsMap_;
 std::unordered_map<std::string, UUIDv4::UUID, StringHash, std::equal_to<>> assetsNameToUUIDMap_;
 std::queue<std::shared_ptr<Asset>> assetsUnloadQueue_;
 std::queue<std::shared_ptr<Asset>> assetsLoadFinalizationQueue_;
 std::mutex assetsLoadFinalizationQueueMutex_;
-std::vector<AssetLoadingTask> loadingTasks_;
+std::list<LoadingTask> loadingTasks_;
 
-std::shared_ptr<Asset> Assets::LoadAsset(std::shared_ptr<Asset> &&asset)
+std::shared_ptr<Asset> Assets::InsertAsset_(std::shared_ptr<Asset> &&asset)
 {
-    NV_PROFILE_FUNC;
-
-    auto loadingData = asset->CreateLoadingData();
-
-    if (asset->RequiresPreLoad())
-        asset->PreLoad(loadingData);
-
-    asset->Load(loadingData);
-
-    if (asset->RequiresPostLoad())
-        asset->PostLoad(loadingData);
-
-    asset->FreeLoadingData(loadingData);
-
     if (asset->GetName().has_value())
         assetsNameToUUIDMap_.emplace(asset->GetName().value(), asset->GetUUID());
 
-    return assetsMap_.emplace(asset->GetUUID(), asset).first->second;
+    auto inserted = assetsMap_.emplace(asset->GetUUID(), std::move(asset));
+    return inserted.first->second;
 }
 
-std::shared_ptr<Asset> Assets::LoadAssetAsync(std::shared_ptr<Asset> &&asset)
+void Assets::InsertLoadingTask_(LoadingTask &&task)
 {
-    NV_PROFILE_FUNC;
-
-    auto loadingData = asset->CreateLoadingData();
-
-    if (asset->RequiresPreLoad())
-        asset->PreLoad(loadingData);
-
-    if (asset->GetName().has_value())
-        assetsNameToUUIDMap_.emplace(asset->GetName().value(), asset->GetUUID());
-
-    auto insertedAsset = assetsMap_.emplace(asset->GetUUID(), asset).first->second;
-
-    AssetLoadingTask task{};
-    task.Asset = insertedAsset;
-    task.LoadingData = loadingData;
-    task.LoadingFuture = std::async(
-        std::launch::async,
-        [=]()
-        {
-            insertedAsset->Load(loadingData);
-        });
-
     loadingTasks_.emplace_back(std::move(task));
-
-    return insertedAsset;
 }
 
 std::shared_ptr<Asset> Assets::GetAsset(const UUIDv4::UUID &uuid)
@@ -150,14 +99,13 @@ void Assets::ProcessLoadingTasks_()
     {
         auto &task = *tasksIt;
 
-        const auto futureStatus = task.LoadingFuture.wait_for(std::chrono::seconds(0));
+        const auto futureStatus = task.Future.wait_for(std::chrono::seconds(0));
         const auto isFutureReady = futureStatus == std::future_status::ready;
 
-        if (isFutureReady && task.Asset->RequiresPostLoad())
+        if (isFutureReady && task.PostLoadFunc.has_value())
         {
-            task.Asset->PostLoad(task.LoadingData);
-            task.Asset->SetStatus(AssetStatus::Loaded);
-            task.Asset->FreeLoadingData(task.LoadingData);
+            task.PostLoadFunc.value()(task.TheAsset, task.LoadingData);
+            task.LoadingDataFreeFunc(task.LoadingData);
 
             tasksIt = loadingTasks_.erase(tasksIt);
         }
