@@ -1,5 +1,5 @@
 #pragma once
-#include <Nova/core/Utility.hpp>
+#include <Nova/core/Flag.hpp>
 #include <glad/gl.h>
 #include <glm/vec4.hpp>
 #include <string>
