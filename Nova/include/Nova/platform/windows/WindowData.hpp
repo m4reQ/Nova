@@ -4,6 +4,7 @@
 #include <Nova/platform/windows/WindowClass.hpp>
 #include <Nova/platform/windows/WindowHandle.hpp>
 #include <Nova/platform/windows/Icon.hpp>
+#include <Nova/platform/windows/Cursor.hpp>
 #include <optional>
 
 namespace Nova
@@ -16,5 +17,6 @@ namespace Nova
         DeviceContext deviceContext;
         WGLContext wglContext;
         std::optional<Icon> userIcon;
+        std::optional<Cursor> userCursor;
     };
 }
