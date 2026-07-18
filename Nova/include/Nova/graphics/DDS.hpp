@@ -1,29 +1,9 @@
 #pragma once
-#include <Nova/core/Utility.hpp>
+#include <Nova/core/Flag.hpp>
 
 namespace Nova
 {
     constexpr auto DDSMagicNumber = 0x20534444ul;
-
-    enum class DDSFourCC : uint32_t
-    {
-        DXT1 = 0x44585431,
-        DXT2 = 0x44585432,
-        DXT3 = 0x44585433,
-        DXT4 = 0x44585434,
-        DXT5 = 0x44585435,
-        DX10 = 0x44583130,
-    };
-
-    enum class DDSPixelFormatFlags : uint32_t
-    {
-        AlphaPixels = 0x1,
-        Alpha = 0x2,
-        FourCC = 0x4,
-        RGB = 0x40,
-        YUV = 0x200,
-        Luminance = 0x20000,
-    };
 
     enum class DDSFlags : uint32_t
     {
@@ -190,7 +170,7 @@ namespace Nova
 
     enum class DDSPixelFormatFlags : uint32_t
     {
-        /// @brief Texture contains alpha data; dwRGBAlphaBitMask contains valid data.
+        /// @brief Texture contains alpha data; RGBAlphaBitMask contains valid data.
         AlphaPixels = 0x1,
 
         /// @brief Used in some older DDS files for alpha channel only uncompressed data (RGBBitCount contains the alpha channel bitcount; ABitMask contains valid data)
@@ -231,7 +211,7 @@ namespace Nova
         uint32_t BBitMask;
         uint32_t ABitMask;
 
-        constexpr bool HasFourCC() const noexcept { return IsFlagSet(Flags, DDSPixelFormatFlags::FourCC); }
+        constexpr bool HasFourCC() const noexcept { return Flag::IsSet(Flags, DDSPixelFormatFlags::FourCC); }
         constexpr bool IsCompressed() const noexcept { return HasFourCC(); }
         constexpr bool IsDXT1() const noexcept { return FourCC == DDSFourCC::DXT1; }
         constexpr bool IsDXT2() const noexcept { return FourCC == DDSFourCC::DXT2; }
@@ -239,6 +219,9 @@ namespace Nova
         constexpr bool IsDXT4() const noexcept { return FourCC == DDSFourCC::DXT4; }
         constexpr bool IsDXT5() const noexcept { return FourCC == DDSFourCC::DXT5; }
         constexpr bool IsDX10() const noexcept { return FourCC == DDSFourCC::DX10; }
+        constexpr bool HasAlpha() const noexcept { return Flag::IsSet(Flags, DDSPixelFormatFlags::AlphaPixels); }
+        constexpr bool IsLuminanceOnly() const noexcept { return Flag::IsSet(Flags, DDSPixelFormatFlags::Luminance); }
+        constexpr bool IsAlphaOnly() const noexcept { return Flag::IsSet(Flags, DDSPixelFormatFlags::Alpha); }
     };
 
     // https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header-dxt10
@@ -269,10 +252,14 @@ namespace Nova
         uint32_t Caps4;
         uint32_t _Reserved2;
 
-        constexpr bool HasWidth() const noexcept { return IsFlagSet(Flags, DDSFlags::Width); }
-        constexpr bool HasHeight() const noexcept { return IsFlagSet(Flags, DDSFlags::Height); }
-        constexpr bool HasPixelFormat() const noexcept { return IsFlagSet(Flags, DDSFlags::PixelFormat); }
+        constexpr bool HasWidth() const noexcept { return Flag::IsSet(Flags, DDSFlags::Width); }
+        constexpr bool HasHeight() const noexcept { return Flag::IsSet(Flags, DDSFlags::Height); }
+        constexpr bool HasPixelFormat() const noexcept { return Flag::IsSet(Flags, DDSFlags::PixelFormat); }
+        constexpr bool HasMipmapCount() const noexcept { return Flag::IsSet(Flags, DDSFlags::MipmapCount); }
+        constexpr bool HasDepth() const noexcept { return Flag::IsSet(Flags, DDSFlags::Depth); }
         constexpr bool IsValid() const noexcept { return HasWidth() && HasHeight() && HasPixelFormat(); }
+        constexpr uint32_t GetDepth() const noexcept { return HasDepth() ? Depth : 1; }
+        constexpr uint32_t GetMipmapCount() const noexcept { return HasMipmapCount() ? MipMapCount : 1; }
     };
 
     NV_DEFINE_BITWISE_OPERATORS(DDSFlags);
@@ -282,6 +269,4 @@ namespace Nova
     NV_DEFINE_BITWISE_OPERATORS(DDSMiscFlags);
 
     NV_DEFINE_BITWISE_OPERATORS(DDSMiscFlags2);
-
-    NV_DEFINE_BITWISE_OPERATORS(DDSPixelFormatFlags);
 }
