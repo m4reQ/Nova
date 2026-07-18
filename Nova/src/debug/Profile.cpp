@@ -9,6 +9,8 @@ using namespace Nova;
 constexpr const std::string_view c_ProfileCounterFormat = ",{{\"name\":\"{}\",\"ph\":\"C\",\"ts\":{},\"args\":{{\"value\":{}}}}}";
 constexpr const std::string_view c_ProfileFrameFormat = ",{{\"name\":\"{}\",\"ph\":\"X\",\"ts\":{},\"dur\":{},\"tid\":{}}}";
 constexpr const std::string_view c_ProfileEventFormat = ",{{\"name\":\"{}\",\"ph\":\"i\",\"ts\":{},\"tid\":{},\"s\":\"g\"}}";
+constexpr const std::string_view c_ThreadNameFormat = ",{{\"name\":\"thread_name\",\"ph\":\"M\",\"tid\":{},\"args\":{{\"name\":\"{}\"}}}}";
+constexpr const std::string_view c_ThreadIndexFormat = ",{{\"name\":\"thread_sort_index\",\"ph\":\"M\",\"tid\":{},\"args\":{{\"sort_index\":\"{}\"}}}}";
 constexpr const std::string_view c_ProfileSessionHeader = "{\"traceEvents\":[{}";
 constexpr const std::string_view c_ProfileSessionFooter = "]}";
 
@@ -153,4 +155,32 @@ void Profile::_WriteProfileCounter(const std::string_view counterName, float val
             counterName,
             DurationToMicroseconds(nowSessionOffset),
             value));
+}
+
+void Profile::_SetCurrentThreadName(const std::string_view threadName) noexcept
+{
+    if (!s_IsEnabled || !IsSessionRunning())
+    {
+        return;
+    }
+
+    WriteToProfileFile(
+        std::format(
+            c_ThreadNameFormat,
+            std::this_thread::get_id(),
+            threadName));
+}
+
+void Profile::_SetCurrentThreadIndex(uint32_t index) noexcept
+{
+    if (!s_IsEnabled || !IsSessionRunning())
+    {
+        return;
+    }
+
+    WriteToProfileFile(
+        std::format(
+            c_ThreadIndexFormat,
+            std::this_thread::get_id(),
+            index));
 }

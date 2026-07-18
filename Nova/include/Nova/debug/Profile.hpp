@@ -11,6 +11,8 @@
 #define NV_PROFILE_COUNTER(name, value) Nova::Profile::_WriteProfileCounter(name, value)
 #define NV_PROFILE_BEGIN_SESSION(filepath) Nova::Profile::BeginSession(filepath)
 #define NV_PROFILE_END_SESSION() Nova::Profile::EndSession()
+#define NV_PROFILE_SET_CURRENT_THREAD_NAME(threadName) Nova::Profile::_SetCurrentThreadName(threadName)
+#define NV_PROFILE_SET_CURRENT_THREAD_INDEX(index) Nova::Profile::_SetCurrentThreadIndex(index)
 #else
 #define NV_PROFILE_SET_ENABLED(isEnabled)
 #define NV_PROFILE_FUNC
@@ -19,6 +21,8 @@
 #define NV_PROFILE_COUNTER(name, value)
 #define NV_PROFILE_BEGIN_SESSION(filepath)
 #define NV_PROFILE_END_SESSION()
+#define NV_PROFILE_SET_CURRENT_THREAD_NAME(threadName)
+#define NV_PROFILE_SET_CURRENT_THREAD_INDEX(index)
 #endif
 
 namespace Nova
@@ -55,5 +59,9 @@ namespace Nova
         void _WriteProfileEvent(const std::string_view eventName) noexcept;
 
         void _WriteProfileCounter(const std::string_view counterName, float value) noexcept;
+
+        void _SetCurrentThreadName(const std::string_view threadName) noexcept;
+
+        void _SetCurrentThreadIndex(uint32_t index) noexcept;
     }
 }
