@@ -22,8 +22,8 @@ static HICON LoadIconFromFile(const std::filesystem::path &filepath, HINSTANCE i
             0,
             LR_LOADFROMFILE | LR_DEFAULTSIZE);
 
-    if (!image)
-        throw std::runtime_error("Failed to load image from file.");
+    if (image == nullptr)
+        throw std::runtime_error("Failed to load icon from file.");
 
     return static_cast<HICON>(image);
 }
@@ -49,7 +49,11 @@ static HICON LoadIconFromData(int width, int height, std::span<const std::byte> 
         .hbmColor = bitmap,
     };
 
-    return CreateIconIndirect(&iconInfo);
+    auto icon = CreateIconIndirect(&iconInfo);
+    if (icon == nullptr)
+        throw std::runtime_error("Failed to load icon from data.");
+
+    return icon;
 }
 
 Nova::Icon::Icon(HICON icon) noexcept
@@ -71,15 +75,7 @@ Nova::Icon::Icon(ICONINFO &info)
 }
 
 Nova::Icon::Icon(const std::filesystem::path &filepath, HINSTANCE instance)
-    : Icon(LoadIconFromFile(filepath, instance))
-{
-    if (icon_ == nullptr)
-        throw std::runtime_error("Failed to load icon from file.");
-}
+    : Icon(LoadIconFromFile(filepath, instance)) {}
 
 Nova::Icon::Icon(int width, int height, std::span<const std::byte> data)
-    : Icon(LoadIconFromData(width, height, data))
-{
-    if (icon_ == nullptr)
-        throw std::runtime_error("Failed to load icon from data.");
-}
+    : Icon(LoadIconFromData(width, height, data)) {}
