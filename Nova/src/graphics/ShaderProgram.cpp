@@ -232,17 +232,14 @@ void ShaderProgram::Use() const
 	glUseProgram(id_);
 }
 
-ShaderProgram ShaderProgram::FromBinary(GLenum binaryFormat, const std::span<uint8_t> binary)
+ShaderProgram ShaderProgram::FromBinary(GLenum binaryFormat, const std::span<std::byte> binary)
 {
 	NV_PROFILE_FUNC;
 
 	return FromBinary(binaryFormat, binary.data(), binary.size_bytes());
 }
 
-ShaderProgram ShaderProgram::FromBinary(
-	GLenum binaryFormat,
-	const uint8_t *binary,
-	size_t binarySize)
+ShaderProgram ShaderProgram::FromBinary(GLenum binaryFormat, const std::byte *binary, size_t binarySize)
 {
 	NV_PROFILE_FUNC;
 
@@ -270,8 +267,8 @@ ShaderProgram ShaderProgram::FromBinary(
 {
 	NV_PROFILE_FUNC;
 
-	const auto [data, size] = File::ReadWholeBinary(filepath);
-	return FromBinary(binaryFormat, data.get(), size);
+	const auto data = File::ReadWholeBinary(filepath);
+	return FromBinary(binaryFormat, data.data(), data.size() * sizeof(std::byte));
 }
 
 ShaderProgram::ShaderProgram(
@@ -372,4 +369,10 @@ void ShaderProgram::SetUniform(const std::string_view name, const glm::vec4 &val
 {
 	NV_PROFILE_FUNC;
 	glProgramUniform4f(id_, GetResourceLocation(name), value.x, value.y, value.z, value.w);
+}
+
+void ShaderProgram::SetUniform(const std::string_view name, GLuint64 value) const
+{
+	NV_PROFILE_FUNC;
+	glProgramUniformHandleui64ARB(id_, GetResourceLocation(name), value);
 }

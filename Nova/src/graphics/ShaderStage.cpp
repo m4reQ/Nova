@@ -77,14 +77,14 @@ ShaderStage ShaderStage::FromGLSL(
 {
 	NV_PROFILE_FUNC;
 
-	const auto [source, size] = File::ReadWholeText(filepath);
-	return FromGLSL(type, std::string_view(source.get(), size));
+	const auto source = File::ReadWholeText(filepath);
+	return FromGLSL(type, std::string_view(source.data(), source.size()));
 }
 
 ShaderStage ShaderStage::FromBinary(
 	ShaderType type,
 	GLenum binaryType,
-	const std::span<uint8_t> binary)
+	std::span<const std::byte> binary)
 {
 	return FromBinary(
 		type,
@@ -96,7 +96,7 @@ ShaderStage ShaderStage::FromBinary(
 ShaderStage ShaderStage::FromBinary(
 	ShaderType type,
 	GLenum binaryType,
-	const uint8_t *binary,
+	const std::byte *binary,
 	size_t binarySize)
 {
 	NV_PROFILE_FUNC;
@@ -124,24 +124,23 @@ ShaderStage ShaderStage::FromBinary(
 {
 	NV_PROFILE_FUNC;
 
-	const auto [binary, size] = File::ReadWholeBinary(filepath);
+	const auto binary = File::ReadWholeBinary(filepath);
 	return FromBinary(
 		type,
 		binaryType,
-		binary.get(),
-		size);
+		binary);
 }
 
 ShaderStage ShaderStage::FromSPIRV(
 	ShaderType type,
-	const std::span<uint8_t> binary)
+	std::span<const std::byte> binary)
 {
 	return FromSPIRV(type, binary.data(), binary.size_bytes());
 }
 
 ShaderStage ShaderStage::FromSPIRV(
 	ShaderType type,
-	const std::span<uint8_t> binary,
+	std::span<const std::byte> binary,
 	const ShaderSpecializeInfo &specializeInfo)
 {
 	NV_PROFILE_FUNC;
@@ -154,7 +153,7 @@ ShaderStage ShaderStage::FromSPIRV(
 
 ShaderStage ShaderStage::FromSPIRV(
 	ShaderType type,
-	const std::uint8_t *binary,
+	const std::byte *binary,
 	size_t binarySize)
 {
 	NV_PROFILE_FUNC;
@@ -164,7 +163,7 @@ ShaderStage ShaderStage::FromSPIRV(
 
 ShaderStage ShaderStage::FromSPIRV(
 	ShaderType type,
-	const std::uint8_t *binary,
+	const std::byte *binary,
 	size_t binarySize,
 	const ShaderSpecializeInfo &specializeInfo)
 {
@@ -182,8 +181,8 @@ ShaderStage ShaderStage::FromSPIRV(
 {
 	NV_PROFILE_FUNC;
 
-	const auto [binary, size] = File::ReadWholeBinary(filepath);
-	return FromSPIRV(type, binary.get(), size);
+	const auto binary = File::ReadWholeBinary(filepath);
+	return FromSPIRV(type, binary);
 }
 
 ShaderStage ShaderStage::FromSPIRV(
