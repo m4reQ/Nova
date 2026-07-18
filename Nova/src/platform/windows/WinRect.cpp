@@ -4,26 +4,16 @@ using namespace Nova;
 
 WinRect WinRect::Client(HWND window)
 {
-    RECT rect;
+    RECT rect{};
     GetClientRect(window, &rect);
 
-    return FromRect(rect);
+    return WinRect(rect);
 }
 
 WinRect WinRect::Window(HWND window)
 {
-    RECT rect;
+    RECT rect{};
     GetWindowRect(window, &rect);
 
-    return FromRect(rect);
-}
-
-WinRect WinRect::FromRect(const RECT &rect)
-{
-    return WinRect{
-        .X = rect.left,
-        .Y = rect.top,
-        .Width = rect.right - rect.left,
-        .Height = rect.bottom - rect.top,
-    };
+    return WinRect(rect);
 }
