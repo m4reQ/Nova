@@ -1,18 +1,15 @@
 #pragma once
 #include <Windows.h>
-#include <span>
+#include <vector>
+#include <string>
 
 namespace Nova
 {
     struct StartupData
     {
-        constexpr StartupData(HINSTANCE exeInstance, HINSTANCE libInstance, const char** args, size_t argsCount) noexcept
-            : ExeInstance(exeInstance),
-              LibInstance(libInstance),
-              Args(args, argsCount) { }
-
-        HINSTANCE ExeInstance;
-        HINSTANCE LibInstance;
-        std::span<const char*> Args;
+        HINSTANCE exeInstance;
+        HINSTANCE libInstance;
+        std::vector<std::string> args;
+        int showCommand;
     };
 }
