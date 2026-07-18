@@ -1,27 +1,11 @@
 #pragma once
 #include <Nova/core/Memory.hpp>
+#include <xxhash.h>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <type_traits>
-#include <xxhash.h>
-
-#define NV_DEFINE_BITWISE_OPERATOR(type, _operator)                                            \
-    constexpr type operator##_operator(type a, type b) noexcept                                \
-    {                                                                                          \
-        using EnumType = std::underlying_type_t<type>;                                         \
-        return static_cast<type>(static_cast<EnumType>(a) _operator static_cast<EnumType>(b)); \
-    }
-
-#define NV_DEFINE_BITWISE_OPERATORS(type)                        \
-    NV_DEFINE_BITWISE_OPERATOR(type, &)                          \
-    NV_DEFINE_BITWISE_OPERATOR(type, |)                          \
-    NV_DEFINE_BITWISE_OPERATOR(type, ^)                          \
-    constexpr type operator~(type value) noexcept                \
-    {                                                            \
-        using EnumType = std::underlying_type_t<type>;           \
-        return static_cast<type>(~static_cast<EnumType>(value)); \
-    }
+#include <algorithm>
 
 namespace Nova
 {
@@ -85,9 +69,53 @@ namespace Nova
         }
     };
 
-    template <typename T>
-    constexpr bool IsFlagSet(T flags, T bit) noexcept
+    inline bool InsensitiveEquals(const std::string_view a, const std::string_view b) noexcept
     {
-        return (flags & bit) == bit;
+        return std::equal(
+            a.begin(),
+            a.end(),
+            b.begin(),
+            b.end(),
+            [](char a, char b)
+            {
+                return std::tolower(a) == std::tolower(b);
+            });
+    }
+
+    template <class... T>
+    struct Overloaded : T...
+    {
+        using T::operator()...;
+    };
+
+    template <class... T>
+    Overloaded(T...) -> Overloaded<T...>;
+
+    inline void FitContentPreserveAspectRatio(
+        float width,
+        float height,
+        float availableWidth,
+        float availableHeight,
+        float &finalWidth,
+        float &finalHeight) noexcept
+    {
+        const auto scaleX = availableWidth / width;
+        const auto scaleY = availableHeight / height;
+        const auto scale = std::min(scaleX, scaleY);
+
+        finalWidth = width * scale;
+        finalHeight = height * scale;
+    }
+
+    inline void CenterContent(
+        float width,
+        float height,
+        float availableWidth,
+        float availableHeight,
+        float &offsetX,
+        float &offsetY) noexcept
+    {
+        offsetX = (availableWidth - width) / 2.0f;
+        offsetY = (availableHeight - height) / 2.0f;
     }
 }
