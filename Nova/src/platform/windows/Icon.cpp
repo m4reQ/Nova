@@ -23,7 +23,7 @@ static HICON LoadIconFromFile(const std::filesystem::path &filepath, HINSTANCE i
             LR_LOADFROMFILE | LR_DEFAULTSIZE);
 
     if (!image)
-        throw std::runtime_error("Failed to load image file.");
+        throw std::runtime_error("Failed to load image from file.");
 
     return static_cast<HICON>(image);
 }
