@@ -12,6 +12,8 @@ namespace Nova
 
         static WinRect Window(HWND window);
 
+        WinRect() = default;
+
         constexpr WinRect(const RECT &rect_) noexcept
             : rect(rect_) {}
 
