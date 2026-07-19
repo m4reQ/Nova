@@ -42,9 +42,9 @@ namespace Nova
 
         constexpr bool HasValue() const noexcept { return value_.has_value(); }
 
-        constexpr operator==(const T &other) const noexcept { return value_.has_value() && (value_.get() == other); }
+        constexpr bool operator==(const T &other) const noexcept { return value_.has_value() && (value_.get() == other); }
 
-        constexpr operator!=(const T &other) const noexcept { return !value_.has_value() || (value_.has_value() && (value_.get() != other)); }
+        constexpr bool operator!=(const T &other) const noexcept { return !value_.has_value() || (value_.has_value() && (value_.get() != other)); }
 
         AutoRelease<T> &operator=(const AutoRelease<T> &) = delete;
 
