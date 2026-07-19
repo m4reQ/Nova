@@ -1,142 +1,132 @@
 #pragma once
-#include <Nova/core/Build.hpp>
-#include <string_view>
+#include <Nova/graphics/WindowData.hpp>
+#include <Nova/graphics/FullscreenMode.hpp>
+#include <Nova/core/StartupData.hpp>
+#include <Nova/core/Flag.hpp>
+#include <memory>
+#include <span>
 #include <optional>
-#include <utility>
 #include <filesystem>
-#include <cstdint>
-#include <glfw/glfw3.h>
-#include <glad/gl.h>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace Nova
 {
-    enum class FullscreenMode
-    {
-        Windowed,
-        Fullscreen,
-        FullscreenBorderless,
-    };
-
     enum WindowFlags
     {
         Default = 0,
-        Resizable = 1,
-        Borderless = 2,
-        Transparent = 4,
-        Vsync = 8,
-        CaptureCursor = 16,
-        StartMaximized = 32,
+        Resizable = (1 << 0),
+        Borderless = (1 << 1),
+        Transparent = (1 << 2),
+        Vsync = (1 << 3),
+        CaptureCursor = (1 << 4),
+        StartMaximized = (1 << 5),
+        StartMinimized = (1 << 6),
+        AllowFileDrop = (1 << 7),
     };
+
+    NV_DEFINE_BITWISE_OPERATORS(WindowFlags);
 
     struct WindowSettings
     {
         int Width;
         int Height;
-        const std::string_view Title;
+        std::string Title;
         WindowFlags Flags = WindowFlags::Default;
         FullscreenMode FullscreenMode = FullscreenMode::Windowed;
         const std::optional<std::filesystem::path> IconFilepath = std::nullopt;
         const std::optional<std::filesystem::path> CursorFilepath = std::nullopt;
     };
 
-    namespace Window
+    class Window
     {
-        NV_API void Resize(std::int32_t width, std::int32_t height) noexcept;
+    public:
+        Window() = default;
 
-        NV_API void Move(std::int32_t x, std::int32_t y) noexcept;
+        Window(const Window &) = delete;
 
-        NV_API void SetTitle(const std::string_view title) noexcept;
+        Window(Window &&) noexcept = default;
 
-        NV_API void SetTitle(const std::wstring_view title) noexcept;
+        Window(const WindowSettings &settings, const StartupData &startupData);
 
-        NV_API void Close() noexcept;
+        void *GetNativeHandle() noexcept;
 
-        NV_API void SetIcon(std::int32_t width, std::int32_t height, std::uint8_t* data);
+        const void *GetNativeHandle() const noexcept;
 
-        NV_API void SetIcon(const std::filesystem::path &filepath);
+        constexpr WindowData &GetData() noexcept { return data_; }
 
-        NV_API void SetCursor(std::int32_t width, std::int32_t height, std::uint8_t* data, std::int32_t xHot = 0, std::int32_t yHot = 0);
+        constexpr const WindowData &GetData() const noexcept { return data_; }
 
-        NV_API void SetCursor(const std::filesystem::path &filepath, std::int32_t xHot = 0, std::int32_t yHot = 0);
+        int GetWidth() const noexcept;
 
-        NV_API void SetFullscreen(FullscreenMode mode) noexcept;
+        int GetHeight() const noexcept;
 
-        NV_API void Maximize();
+        std::pair<int, int> GetSize() const noexcept;
 
-        NV_API void Iconfiy();
+        float GetAspectRatio() const noexcept;
 
-        NV_API std::pair<int, int> GetSize() noexcept;
+        int GetClientWidth() const noexcept;
 
-        NV_API void GetSize(int &width, int &height) noexcept;
+        int GetClientHeight() const noexcept;
 
-        NV_API int GetWidth() noexcept;
+        float GetClientAspectRatio() const noexcept;
 
-        NV_API int GetHeight() noexcept;
+        std::pair<int, int> GetClientSize() const noexcept;
 
-        NV_API float GetAspectRatio() noexcept;
+        int GetX() const noexcept;
 
-        NV_API std::pair<int, int> GetFramebufferSize() noexcept;
+        int GetY() const noexcept;
 
-        NV_API void GetFramebufferSize(int &width, int &height) noexcept;
+        std::pair<int, int> GetPosition() const noexcept;
 
-        NV_API int GetFramebufferWidth() noexcept;
+        std::string GetTitle() const noexcept;
 
-        NV_API int GetFramebufferHeight() noexcept;
+        bool ShouldClose() const noexcept;
 
-        NV_API float GetFramebufferAspectRatio() noexcept;
+        FullscreenMode GetFullscreenMode() const noexcept;
 
-        NV_API std::pair<int, int> GetPosition() noexcept;
+        bool IsFullscreen() const noexcept;
 
-        NV_API void GetPosition(int &x, int &y) noexcept;
+        bool IsWindowed() const noexcept;
 
-        NV_API bool IsVisible() noexcept;
+        bool IsVisible() const noexcept;
 
-        NV_API bool IsFullscreen() noexcept;
+        void Resize(int width, int height) noexcept;
 
-        NV_API bool ShouldClose() noexcept;
+        void Move(int x, int y) noexcept;
 
-        NV_API void SetCursorCapture(bool isCaptured) noexcept;
+        void Close() noexcept;
 
-        NV_API GLFWwindow *GetNativeHandle() noexcept;
+        void SetTitle(const std::string_view title) noexcept;
 
-        /// <summary>
-        /// Private API. Don't use directly!
-        /// </summary>
-        void Initialize_(const WindowSettings &settings);
+        void SetTitle(const std::wstring_view title) noexcept;
 
-        /// <summary>
-        /// Private API. Don't use directly!
-        /// </summary>
-        void Shutdown_() noexcept;
+        void Maximize() noexcept;
 
-        /// <summary>
-        /// Private API. Don't use directly!
-        /// </summary>
-        void Update_() noexcept;
+        void Minimize() noexcept;
 
-        /// <summary>
-        /// Private API. Don't use directly!
-        /// </summary>
-        void SwapBuffers_() noexcept;
+        void SwapBuffers() noexcept;
 
-        /// <summary>
-        /// Private API. Don't use directly!
-        /// </summary>
-        GLADloadfunc GetLoaderFunc_() noexcept;
-    }
+        void ProcessEvents();
 
-    constexpr WindowFlags operator&(WindowFlags a, WindowFlags b) noexcept
-    {
-        return (WindowFlags)((std::underlying_type_t<WindowFlags>)a & (std::underlying_type_t<WindowFlags>)b);
-    }
+        void SetIcon(const std::filesystem::path &filepath);
 
-    constexpr WindowFlags operator|(WindowFlags a, WindowFlags b) noexcept
-    {
-        return (WindowFlags)((std::underlying_type_t<WindowFlags>)a | (std::underlying_type_t<WindowFlags>)b);
-    }
+        void SetIcon(int width, int height, std::span<const std::byte> data);
 
-    constexpr WindowFlags operator^(WindowFlags a, WindowFlags b) noexcept
-    {
-        return (WindowFlags)((std::underlying_type_t<WindowFlags>)a ^ (std::underlying_type_t<WindowFlags>)b);
-    }
+        void SetCursor(const std::filesystem::path &filepath);
+
+        void SetCursorCaptured(bool captured) noexcept;
+
+        void SetFullscreen(FullscreenMode mode) noexcept;
+
+        Window &operator=(const Window &) = delete;
+
+        Window &operator=(Window &&) noexcept = default;
+
+    private:
+        WindowData data_;
+
+        static LRESULT CALLBACK WindowProc(HWND win, UINT msg, WPARAM wParam, LPARAM lParam) noexcept;
+    };
 }
