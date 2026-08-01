@@ -34,11 +34,11 @@ target_link_libraries(imgui PUBLIC glfw)
 add_library(
     imguizmo
     STATIC
-    "${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/ImGuizmo.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/ImGradient.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/ImCurveEdit.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/ImSequencer.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/GraphEditor.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/src/ImGuizmo.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/src/ImGradient.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/src/ImCurveEdit.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/src/ImSequencer.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/ImGuizmo/src/GraphEditor.cpp")
 target_include_directories(
     imguizmo
     PUBLIC

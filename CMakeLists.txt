@@ -8,6 +8,9 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # libktx
+set(BUILD_SHARED_LIBS OFF)
+set(LIBKTX_FEATURE_VK_UPLOAD OFF)
+set(LIBKTX_FEATURE_GL_UPLOAD OFF)
 add_subdirectory(vendor/KTX-Software/lib)
 
 # entt
