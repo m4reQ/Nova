@@ -6,17 +6,9 @@
 #include <Nova/platform/windows/Bitmap.hpp>
 #include <Nova/platform/windows/WinRect.hpp>
 #include <array>
-#include <glad/wgl.h>
 #include <Windowsx.h>
 #include <shellapi.h>
 
-#ifdef NV_DEBUG
-constexpr auto cContextFlags = WGL_CONTEXT_DEBUG_BIT_ARB | WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
-#else
-constexpr auto cContextFlags = WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
-#endif
-constexpr auto cContextVersionMajor = 4;
-constexpr auto cContextVersionMinor = 5;
 constexpr auto cWindowClassName = "NovaWindow";
 
 static void SendSetIcon(HWND window, const Nova::Icon &icon) noexcept
@@ -94,73 +86,6 @@ static HANDLE LoadImageFromFile(const std::filesystem::path &path, UINT imageTyp
     return image;
 }
 
-static void SelectPixelFormat(HDC deviceContext, std::span<const int> formatAttributes)
-{
-    NV_PROFILE_FUNC;
-
-    auto formatIndex = 0;
-    auto foundFormatsCount = 0u;
-    const auto formatFound = wglChoosePixelFormatARB(
-        deviceContext,
-        formatAttributes.data(),
-        nullptr,
-        1,
-        &formatIndex,
-        &foundFormatsCount);
-    if (!formatFound)
-        throw std::runtime_error("Failed to find suitable pixel format.");
-
-    SetPixelFormat(deviceContext, formatIndex, nullptr);
-}
-
-static void LoadWGL(HINSTANCE hInstance)
-{
-    NV_PROFILE_FUNC;
-
-    constexpr auto wndClassName = "NovaDummyWindow";
-    auto wndClass = Nova::WindowClass(
-        WNDCLASSEXA{
-            .cbSize = sizeof(WNDCLASSEXA),
-            .style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-            .lpfnWndProc = DefWindowProcA,
-            .hInstance = hInstance,
-            .lpszClassName = wndClassName,
-        });
-    auto windowHandle = Nova::WindowHandle(
-        0,
-        wndClass,
-        "",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        500,
-        500,
-        hInstance);
-    auto dc = Nova::DeviceContext(windowHandle);
-
-    const PIXELFORMATDESCRIPTOR pfd{
-        .nSize = sizeof(PIXELFORMATDESCRIPTOR),
-        .nVersion = 1,
-        .dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
-        .iPixelType = PFD_TYPE_RGBA,
-        .cColorBits = 24,
-        .cAlphaBits = 0,
-        .cDepthBits = 0,
-        .cStencilBits = 0,
-        .iLayerType = PFD_MAIN_PLANE,
-    };
-    const auto pfdIndex = ChoosePixelFormat(dc, &pfd);
-    if (!pfdIndex)
-        throw std::runtime_error("Failed to find suitable pixel format for dummy window.");
-
-    if (!SetPixelFormat(dc, pfdIndex, &pfd))
-        throw std::runtime_error("Failed to set pixel format for dummy window.");
-
-    auto glContext = Nova::WGLContext(dc);
-    glContext.MakeCurrent(dc);
-    glContext.LoadModern(dc);
-}
-
 static constexpr DWORD GetStyleEx(Nova::WindowFlags flags) noexcept
 {
     auto styleEx = 0l;
@@ -175,7 +100,7 @@ static constexpr DWORD GetStyleEx(Nova::WindowFlags flags) noexcept
 
 static constexpr DWORD GetStyle(Nova::WindowFlags flags) noexcept
 {
-    auto style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_VISIBLE;
+    auto style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
     if (Nova::Flag::IsSet(flags, Nova::WindowFlags::Resizable))
         Nova::Flag::Set(style, WS_THICKFRAME);
 
@@ -496,10 +421,7 @@ Nova::Window::Window(
 {
     NV_PROFILE_FUNC;
 
-    LoadWGL(startupData.exeInstance);
-
     data_.instance = startupData.exeInstance;
-
     data_.wndClass = WindowClass(
         WNDCLASSEXA{
             .cbSize = sizeof(WNDCLASSEXA),
@@ -508,7 +430,6 @@ Nova::Window::Window(
             .cbWndExtra = sizeof(WindowData),
             .lpszClassName = cWindowClassName,
         });
-
     data_.handle = WindowHandle(
         GetStyleEx(settings.Flags),
         data_.wndClass,
@@ -519,45 +440,10 @@ Nova::Window::Window(
         settings.Width,
         settings.Height,
         startupData.exeInstance);
-
     data_.deviceContext = DeviceContext(data_.handle);
 
-    const auto formatAttribs = std::array<int, 17>({
-        WGL_DRAW_TO_WINDOW_ARB,
-        GL_TRUE,
-        WGL_SUPPORT_OPENGL_ARB,
-        GL_TRUE,
-        WGL_DOUBLE_BUFFER_ARB,
-        GL_TRUE,
-        WGL_PIXEL_TYPE_ARB,
-        WGL_TYPE_RGBA_ARB,
-        WGL_COLOR_BITS_ARB,
-        24,
-        WGL_ALPHA_BITS_ARB,
-        8,
-        WGL_DEPTH_BITS_ARB,
-        24,
-        WGL_STENCIL_BITS_ARB,
-        8,
-        0,
-    });
-    SelectPixelFormat(data_.deviceContext, formatAttribs);
-
-    const auto contextAttribs = std::array<int, 9>({
-        WGL_CONTEXT_MAJOR_VERSION_ARB,
-        cContextVersionMajor,
-        WGL_CONTEXT_MINOR_VERSION_ARB,
-        cContextVersionMinor,
-        WGL_CONTEXT_FLAGS_ARB,
-        cContextFlags,
-        WGL_CONTEXT_PROFILE_MASK_ARB,
-        WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-        0,
-    });
-    data_.wglContext = WGLContext(data_.deviceContext, contextAttribs);
-    data_.wglContext.MakeCurrent(data_.deviceContext);
-
     SetWindowLongPtrA(data_.handle, 0, reinterpret_cast<LONG_PTR>(this));
+    ShowWindow(data_.handle, startupData.showCommand);
 }
 
 void *Nova::Window::GetNativeHandle() noexcept

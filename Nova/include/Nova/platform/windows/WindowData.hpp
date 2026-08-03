@@ -1,6 +1,5 @@
 #pragma once
 #include <Nova/platform/windows/DeviceContext.hpp>
-#include <Nova/platform/windows/WGLContext.hpp>
 #include <Nova/platform/windows/WindowClass.hpp>
 #include <Nova/platform/windows/WindowHandle.hpp>
 #include <Nova/platform/windows/Icon.hpp>
@@ -17,7 +16,6 @@ namespace Nova
         WindowClass wndClass;
         WindowHandle handle;
         DeviceContext deviceContext;
-        WGLContext wglContext;
         std::optional<Icon> userIcon;
         std::optional<Cursor> userCursor;
         WinRect savedRect;
