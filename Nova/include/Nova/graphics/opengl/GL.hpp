@@ -3,12 +3,29 @@
 #include <glad/gl.h>
 #include <glm/vec4.hpp>
 #include <string>
+#include <string_view>
 #include <span>
 #include <concepts>
 
 namespace Nova
 {
     // TODO Add implicit casts to GLenum for strong typed enumerations
+
+    /// @brief Specifies a symbolic constant used to retrieve string information about current OpenGL connection.
+    enum class StringName : GLenum
+    {
+        /// @brief The company responsible for this GL implementation. This name does not change from release to release.
+        Vendor = GL_VENDOR,
+
+        /// @brief The name of the renderer. This name is typically specific to a particular configuration of a hardware platform. It does not change from release to release.
+        Renderer = GL_RENDERER,
+
+        /// @brief A version or release number.
+        Version = GL_VERSION,
+
+        /// @brief A version or release number for the shading language.
+        ShadingLanguageVersion = GL_SHADING_LANGUAGE_VERSION,
+    };
 
     enum class WindingOrder : GLenum
     {
@@ -1162,6 +1179,22 @@ namespace Nova
         inline void NamedFramebufferRenderbuffer(GLuint framebuffer, Attachment attachment, GLuint renderbuffer) noexcept
         {
             glNamedFramebufferRenderbuffer(framebuffer, (GLenum)attachment, GL_RENDERBUFFER, renderbuffer);
+        }
+
+        /// @brief Returns a string describing the current GL connection.
+        /// @param name Specifies a symbolic constant (see: @ref StringName)
+        /// @return A view to a static string describing some aspect of the current GL connection.
+        inline std::string_view GetString(StringName name) noexcept
+        {
+            return reinterpret_cast<const char *>(glGetString(static_cast<GLenum>(name)));
+        }
+
+        /// @brief Returns a string describing name of an OpenGL extension with corresponding index.
+        /// @param index Specifies the index of the string to return
+        /// @return An OpenGL extension name.
+        inline std::string_view GetString(GLuint index) noexcept
+        {
+            return reinterpret_cast<const char *>(glGetStringi(GL_EXTENSIONS, index));
         }
     }
 
