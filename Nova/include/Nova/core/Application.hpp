@@ -1,103 +1,69 @@
 #pragma once
-#include <Nova/core/Build.hpp>
-#include <Nova/core/Layer.hpp>
-#include <Nova/core/Event.hpp>
 #include <Nova/graphics/Window.hpp>
-#include <Nova/graphics/RendererSettings.hpp>
-#include <Nova/dotnet/DotnetSettings.hpp>
-#include <vector>
-#include <concepts>
-#include <filesystem>
+#include <Nova/graphics/Renderer.hpp>
+#include <Nova/events/EventSystem.hpp>
+#include <Nova/events/Event.hpp>
+#include <Nova/input/InputSystem.hpp>
+#include <chrono>
 
 namespace Nova
 {
-    struct ApplicationSettings
+    class Application
     {
-        WindowSettings WindowSettings;
-        DotnetSettings DotnetSettings;
-        RendererSettings RendererSettings;
-        std::filesystem::path ShaderCacheDirectory;
-        size_t TextInputBufferSize;
+    public:
+        Application() = default;
+
+        Application(const std::string_view name, const StartupData &startupData, const WindowSettings &windowSettings);
+
+        Application(const Application &) = delete;
+
+        Application(Application &&) noexcept = default;
+
+        virtual ~Application() noexcept = default;
+
+        void Run();
+
+        virtual void OnLoad() = 0;
+
+        virtual void OnClose() = 0;
+
+        virtual void OnRender() = 0;
+
+        virtual void OnUpdate() = 0;
+
+        virtual void OnEvent(const Event &event) = 0;
+
+        constexpr Window &GetWindow() noexcept { return window_; }
+
+        constexpr const Window &GetWindow() const noexcept { return window_; }
+
+        constexpr EventSystem &GetEventSystem() noexcept { return eventSystem_; }
+
+        constexpr const EventSystem &GetEventSystem() const noexcept { return eventSystem_; }
+
+        constexpr const InputSystem &GetInputSystem() const noexcept { return inputSystem_; }
+
+        constexpr InputSystem &GetInputSystem() noexcept { return inputSystem_; }
+
+        constexpr const std::string_view GetName() const noexcept { return name_; }
+
+        constexpr double GetFrametime() const noexcept { return frametime_; }
+
+        constexpr double GetFPS() const noexcept { return 1.0 / frametime_; }
+
+        double GetTime() const noexcept;
+
+        Application &operator=(const Application &) = delete;
+
+        Application &operator=(Application &&) noexcept = default;
+
+    private:
+        EventSystem eventSystem_;
+        InputSystem inputSystem_;
+        Window window_;
+        Renderer renderer_;
+        std::string name_;
+        std::chrono::high_resolution_clock::time_point appStart_;
+        double frametime_ = 1.0;
     };
-
-    namespace Application
-    {
-        /// <summary>
-        /// Private API. Don't user directly!
-        /// </summary>
-        void _QueueLayerTransition(Layer *from, std::unique_ptr<Layer>&& to) noexcept;
-
-        /// <summary>
-        /// Private API. Don't use directly!
-        /// </summary>
-        /// <param name="event"></param>
-        void InvokeEvent_(const Event& event);
-
-        /// <summary>
-        /// Private API. Don't use directly!
-        /// </summary>
-        template <typename TEvent, typename... Args>
-            requires (std::derived_from<TEvent, Event>)
-        void InvokeEvent_(Args&&... args)
-        {
-            TEvent event(std::forward<Args>(args)...);
-            InvokeEvent_(event);
-        }
-
-        NV_API void Initialize(const ApplicationSettings &settings);
-
-        NV_API void Run();
-
-        NV_API void Stop();
-
-        NV_API bool IsInitialized() noexcept;
-
-        NV_API bool IsRunning() noexcept;
-
-        NV_API double GetFrametime() noexcept;
-
-        NV_API std::vector<std::unique_ptr<Layer>>& GetLayers() noexcept;
-
-        NV_API bool HasLayer(const std::string_view layerName);
-
-        NV_API Layer *GetTopLayer() noexcept;
-
-        NV_API Layer *GetBottomLayer() noexcept;
-
-        NV_API Layer *GetLayer(const std::string_view layerName) noexcept;
-
-        template <typename TLayer>
-            requires(std::derived_from<TLayer, Layer>)
-        TLayer *GetLayer(const std::string_view layerName) noexcept
-        {
-            return static_cast<TLayer*>(GetLayer(layerName));
-        }
-
-        NV_API void PushLayer(std::unique_ptr<Layer>&& layer);
-
-        template <typename TLayer, typename... Args>
-            requires(std::derived_from<TLayer, Layer>)
-        void PushLayer(Args&&... args)
-        {
-            PushLayer(std::make_unique<TLayer>(std::forward<Args>(args)...));
-        }
-
-        NV_API void InsertLayerAfter(const std::string_view layerName, std::unique_ptr<Layer>&& layer);
-
-        template <typename TLayer, typename... Args>
-            requires(std::derived_from<TLayer, Layer>)
-        void InsertLayerAfter(const std::string_view layerName, Args&&... args)
-        {
-            InsertLayerAfter(layerName, std::make_unique<TLayer>(std::forward<Args>(args)...));
-        }
-
-        NV_API void InsertLayerBefore(const std::string_view layerName, std::unique_ptr<Layer>&& layer);
-
-        template <typename TLayer, typename... Args>
-            requires(std::derived_from<TLayer, Layer>)
-        void InsertLayerBefore(const std::string_view layerName, Args&&... args)
-        {
-            InsertLayerBefore(layerName, std::make_unique<TLayer>(std::forward<Args>(args)...));
-        }
-    }
 }
