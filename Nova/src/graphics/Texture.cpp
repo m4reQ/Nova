@@ -12,6 +12,7 @@ static void CreateTextureStorage(TextureTarget target, GLuint texture, const Tex
     {
     case TextureTarget::Texture2D:
     case TextureTarget::Texture1DArray:
+    case TextureTarget::TextureCubeMap:
         GL::TextureStorage2D(
             texture,
             spec.Mipmaps,
@@ -43,13 +44,6 @@ Texture::Texture(TextureTarget target, const TextureSpec &spec)
     glGetTextureParameteriv(id_, GL_TEXTURE_IMMUTABLE_FORMAT, &isImmutable);
     if (!isImmutable)
         throw std::runtime_error("Failed to create texture.");
-
-    if (spec.AllowBindless)
-    {
-        bindlessHandle_ = glGetTextureHandleARB(id_);
-        if (!bindlessHandle_)
-            throw std::runtime_error("Failed to create bindless texture.");
-    }
 }
 
 Texture::~Texture() noexcept
@@ -63,33 +57,37 @@ void Texture::Bind(GLuint unit) const noexcept
     glBindTextureUnit(unit, id_);
 }
 
-void Texture::MakeResident() const noexcept
-{
-    NV_PROFILE_FUNC;
-    glMakeTextureHandleResidentARB(bindlessHandle_);
-}
-
-void Texture::MakeNonResident() const noexcept
-{
-    NV_PROFILE_FUNC;
-    glMakeTextureHandleNonResidentARB(bindlessHandle_);
-}
-
-void Texture::Upload(const TextureUploadInfo &info, const void *data) const noexcept
+void Texture::Upload(const TextureUploadInfo &info, const void *data, bool generateMipmap) const noexcept
 {
     NV_PROFILE_FUNC;
 
-    GL::TextureSubImage2D(
-        id_,
-        info.Mipmap,
-        info.Offset.x,
-        info.Offset.y,
-        info.Size.x,
-        info.Size.y,
-        info.PixelFormat,
-        info.PixelType,
-        data);
+    // TODO Better check for 1D/2D/3D targets
+    if (target_ == TextureTarget::TextureCubeMap)
+        glTextureSubImage3D(
+            id_,
+            info.Mipmap,
+            info.Offset.x,
+            info.Offset.y,
+            info.Offset.z,
+            info.Size.x,
+            info.Size.y,
+            info.Size.z,
+            (GLenum)info.PixelFormat,
+            (GLenum)info.PixelType,
+            (uint8_t *)data + info.DataOffset);
+    else
+        GL::TextureSubImage2D(
+            id_,
+            info.Mipmap,
+            info.Offset.x,
+            info.Offset.y,
+            info.Size.x,
+            info.Size.y,
+            info.PixelFormat,
+            info.PixelType,
+            (uint8_t *)data + info.DataOffset);
 
+    if (generateMipmap)
     {
         NV_PROFILE_SCOPE("::GenerateTextureMipmap");
         GL::GenerateTextureMipmap(id_);
