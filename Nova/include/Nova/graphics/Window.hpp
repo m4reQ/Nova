@@ -3,6 +3,7 @@
 #include <Nova/graphics/FullscreenMode.hpp>
 #include <Nova/core/StartupData.hpp>
 #include <Nova/core/Flag.hpp>
+#include <Nova/events/EventSystem.hpp>
 #include <memory>
 #include <span>
 #include <optional>
@@ -48,7 +49,10 @@ namespace Nova
 
         Window(Window &&) noexcept = default;
 
-        Window(const WindowSettings &settings, const StartupData &startupData);
+        Window(
+            const WindowSettings &settings,
+            const StartupData &startupData,
+            EventSystem &eventSystem);
 
         void *GetNativeHandle() noexcept;
 
@@ -126,7 +130,10 @@ namespace Nova
 
     private:
         WindowData data_;
+        EventSystem &eventSystem_;
 
         static LRESULT CALLBACK WindowProc(HWND win, UINT msg, WPARAM wParam, LPARAM lParam) noexcept;
+
+        LRESULT HandleMessage(HWND win, UINT msg, WPARAM wParam, LPARAM lParam) noexcept;
     };
 }

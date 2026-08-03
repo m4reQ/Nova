@@ -2,12 +2,14 @@
 #include <Nova/debug/Profile.hpp>
 #include <Nova/debug/Log.hpp>
 #include <Nova/core/Input.hpp>
+#include <Nova/events/Events.hpp>
 #include <Nova/core/Application.hpp>
 #include <Nova/platform/windows/Bitmap.hpp>
 #include <Nova/platform/windows/WinRect.hpp>
 #include <array>
 #include <glad/wgl.h>
 #include <Windowsx.h>
+#include <shellapi.h>
 
 #ifdef NV_DEBUG
 constexpr auto cContextFlags = WGL_CONTEXT_DEBUG_BIT_ARB | WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
@@ -331,27 +333,27 @@ static constexpr Nova::Button GetButtonFromMsg(UINT msg, WPARAM wParam) noexcept
     }
 }
 
-static void HandleButtonDown(UINT msg, WPARAM wParam) noexcept
+static void HandleButtonDown(Nova::EventSystem &eventSystem, UINT msg, WPARAM wParam) noexcept
 {
     NV_PROFILE_FUNC;
 
     const auto button = GetButtonFromMsg(msg, wParam);
 
     Nova::Input::UpdateButton_(button, true);
-    Nova::Application::InvokeEvent_<Nova::MouseButtonDownEvent>(button);
+    eventSystem.InvokeEvent<Nova::MouseButtonDownEvent>(button);
 }
 
-static void HandleButtonUp(UINT msg, WPARAM wParam) noexcept
+static void HandleButtonUp(Nova::EventSystem &eventSystem, UINT msg, WPARAM wParam) noexcept
 {
     NV_PROFILE_FUNC;
 
     const auto button = GetButtonFromMsg(msg, wParam);
 
     Nova::Input::UpdateButton_(button, false);
-    Nova::Application::InvokeEvent_<Nova::MouseButtonUpEvent>(button);
+    eventSystem.InvokeEvent<Nova::MouseButtonUpEvent>(button);
 }
 
-static void HandleMouseMove(LPARAM lParam) noexcept
+static void HandleMouseMove(Nova::EventSystem &eventSystem, LPARAM lParam) noexcept
 {
     NV_PROFILE_FUNC;
 
@@ -362,23 +364,23 @@ static void HandleMouseMove(LPARAM lParam) noexcept
     const auto yDelta = yPos - Nova::Input::GetMouseY();
 
     Nova::Input::UpdateMousePos_(xPos, yPos);
-    Nova::Application::InvokeEvent_<Nova::MouseMoveEvent>(xPos, yPos, xDelta, yDelta);
+    eventSystem.InvokeEvent<Nova::MouseMoveEvent>(xPos, yPos, xDelta, yDelta);
 }
 
-static void HandleScroll(double vDelta, double hDelta) noexcept
+static void HandleScroll(Nova::EventSystem &eventSystem, double vDelta, double hDelta) noexcept
 {
     NV_PROFILE_FUNC;
 
     Nova::Input::UpdateMouseScroll_(vDelta, hDelta);
-    Nova::Application::InvokeEvent_<Nova::MouseScrollEvent>(vDelta, hDelta);
+    eventSystem.InvokeEvent<Nova::MouseScrollEvent>(vDelta, hDelta);
 }
 
-static void HandleKeyUp(WPARAM wParam, bool isExtended) noexcept
+static void HandleKeyUp(Nova::EventSystem &eventSystem, WPARAM wParam, bool isExtended) noexcept
 {
     NV_PROFILE_FUNC;
 
     const auto key = TranslateKey(wParam, isExtended);
-    Nova::Application::InvokeEvent_<Nova::KeyUpEvent>(key);
+    eventSystem.InvokeEvent<Nova::KeyUpEvent>(key);
 }
 
 static void HandleChar(WPARAM wParam) noexcept
@@ -388,12 +390,32 @@ static void HandleChar(WPARAM wParam) noexcept
     Nova::Input::AppendTextChar_(static_cast<wchar_t>(wParam));
 }
 
-static void HandleKeyDown(WPARAM wParam, bool isExtended, bool isRepeated) noexcept
+static void HandleKeyDown(Nova::EventSystem &eventSystem, WPARAM wParam, bool isExtended, bool isRepeated) noexcept
 {
     NV_PROFILE_FUNC;
 
     const auto key = TranslateKey(wParam, isExtended);
-    Nova::Application::InvokeEvent_<Nova::KeyDownEvent>(key, isRepeated);
+    eventSystem.InvokeEvent<Nova::KeyDownEvent>(key, isRepeated);
+}
+
+static void HandleDropFiles(Nova::EventSystem &eventSystem, HDROP drop) noexcept
+{
+    NV_PROFILE_FUNC;
+
+    const auto pathsCount = DragQueryFileW(drop, static_cast<UINT>(-1), nullptr, 0);
+
+    std::vector<std::filesystem::path> paths;
+    paths.reserve(pathsCount);
+
+    for (UINT i = 0; i < pathsCount; i++)
+    {
+        std::array<wchar_t, MAX_PATH> pathBuf;
+        const auto pathLength = DragQueryFileW(drop, i, pathBuf.data(), pathBuf.size());
+
+        paths.emplace_back(pathBuf.begin(), pathBuf.begin() + pathLength);
+    }
+
+    eventSystem.InvokeEvent<Nova::FileDropEvent>(std::move(paths));
 }
 
 LRESULT CALLBACK Nova::Window::WindowProc(HWND win, UINT msg, WPARAM wParam, LPARAM lParam) noexcept
@@ -401,64 +423,75 @@ LRESULT CALLBACK Nova::Window::WindowProc(HWND win, UINT msg, WPARAM wParam, LPA
     NV_PROFILE_FUNC;
 
     auto *window = reinterpret_cast<Window *>(GetWindowLongPtrA(win, 0));
+    return window->HandleMessage(win, msg, wParam, lParam);
+}
 
+LRESULT Nova::Window::HandleMessage(HWND win, UINT msg, WPARAM wParam, LPARAM lParam) noexcept
+{
     switch (msg)
     {
     case WM_DESTROY:
         PostQuitMessage(0);
         return FALSE;
     case WM_SIZE:
-        Nova::Application::InvokeEvent_<WindowResizeEvent>(LOWORD(lParam), HIWORD(lParam));
+        eventSystem_.InvokeEvent<WindowResizeEvent>(LOWORD(lParam), HIWORD(lParam));
         return FALSE;
     case WM_MOVE:
-        Nova::Application::InvokeEvent_<WindowMoveEvent>(LOWORD(lParam), HIWORD(lParam));
+        eventSystem_.InvokeEvent<WindowMoveEvent>(LOWORD(lParam), HIWORD(lParam));
         return FALSE;
     case WM_CLOSE:
-        window->data_.shouldClose = true;
-        Nova::Application::InvokeEvent_<WindowCloseEvent>(0.0);
+        data_.shouldClose = true;
+        eventSystem_.InvokeEvent<WindowCloseEvent>(0.0);
         return FALSE;
     case WM_KILLFOCUS:
-        Nova::Application::InvokeEvent_<WindowFocusEvent>(false);
+        eventSystem_.InvokeEvent<WindowFocusEvent>(false);
         return FALSE;
     case WM_SETFOCUS:
-        Nova::Application::InvokeEvent_<WindowFocusEvent>(true);
+        eventSystem_.InvokeEvent<WindowFocusEvent>(true);
         return FALSE;
     case WM_LBUTTONDOWN:
     case WM_RBUTTONDOWN:
     case WM_MBUTTONDOWN:
     case WM_XBUTTONDOWN:
-        HandleButtonDown(msg, wParam);
+        HandleButtonDown(eventSystem_, msg, wParam);
         return msg == WM_XBUTTONDOWN;
     case WM_LBUTTONUP:
     case WM_RBUTTONUP:
     case WM_MBUTTONUP:
     case WM_XBUTTONUP:
-        HandleButtonUp(msg, wParam);
+        HandleButtonUp(eventSystem_, msg, wParam);
         return msg == WM_XBUTTONUP;
     case WM_MOUSEMOVE:
-        HandleMouseMove(lParam);
+        HandleMouseMove(eventSystem_, lParam);
         return FALSE;
     case WM_MOUSEWHEEL:
-        HandleScroll(GET_WHEEL_DELTA_WPARAM(wParam) / 120.0, 0.0);
+        HandleScroll(eventSystem_, GET_WHEEL_DELTA_WPARAM(wParam) / 120.0, 0.0);
         return TRUE;
     case WM_MOUSEHWHEEL:
-        HandleScroll(0.0, GET_WHEEL_DELTA_WPARAM(wParam) / 120.0);
+        HandleScroll(eventSystem_, 0.0, GET_WHEEL_DELTA_WPARAM(wParam) / 120.0);
         return TRUE;
     case WM_KEYUP:
-        HandleKeyUp(wParam, (lParam & (1 << 24)) == lParam);
+        HandleKeyUp(eventSystem_, wParam, (lParam & (1 << 24)) == lParam);
         return FALSE;
     case WM_KEYDOWN:
-        HandleKeyDown(wParam, (lParam & (1 << 24)) == lParam, (lParam & 0xFFFF) > 1);
+        HandleKeyDown(eventSystem_, wParam, (lParam & (1 << 24)) == lParam, (lParam & 0xFFFF) > 1);
         return FALSE;
     case WM_CHAR:
         HandleChar(wParam);
+        return FALSE;
+    case WM_DROPFILES:
+        HandleDropFiles(eventSystem_, reinterpret_cast<HDROP>(wParam));
         return FALSE;
     default:
         return DefWindowProcA(win, msg, wParam, lParam);
     }
 }
 
-Nova::Window::Window(const WindowSettings &settings, const StartupData &startupData)
+Nova::Window::Window(
+    const WindowSettings &settings,
+    const StartupData &startupData,
+    EventSystem &eventSystem)
+    : eventSystem_(eventSystem)
 {
     NV_PROFILE_FUNC;
 
