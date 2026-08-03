@@ -1,5 +1,5 @@
 #pragma once
-#include <Nova/core/Input.hpp>
+#include <Nova/input/Button.hpp>
 #include <Nova/events/Event.hpp>
 
 namespace Nova

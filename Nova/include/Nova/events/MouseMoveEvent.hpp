@@ -1,5 +1,4 @@
 #pragma once
-#include <Nova/core/Input.hpp>
 #include <Nova/events/Event.hpp>
 #include <glm/vec2.hpp>
 

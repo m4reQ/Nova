@@ -10,3 +10,4 @@
 #include <Nova/events/WindowFocusEvent.hpp>
 #include <Nova/events/WindowMoveEvent.hpp>
 #include <Nova/events/WindowResizeEvent.hpp>
+#include <Nova/events/EventSystem.hpp>

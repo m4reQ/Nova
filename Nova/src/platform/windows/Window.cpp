@@ -1,7 +1,6 @@
 #include <Nova/graphics/Window.hpp>
 #include <Nova/debug/Profile.hpp>
 #include <Nova/debug/Log.hpp>
-#include <Nova/core/Input.hpp>
 #include <Nova/events/Events.hpp>
 #include <Nova/core/Application.hpp>
 #include <Nova/platform/windows/Bitmap.hpp>
@@ -333,91 +332,6 @@ static constexpr Nova::Button GetButtonFromMsg(UINT msg, WPARAM wParam) noexcept
     }
 }
 
-static void HandleButtonDown(Nova::EventSystem &eventSystem, UINT msg, WPARAM wParam) noexcept
-{
-    NV_PROFILE_FUNC;
-
-    const auto button = GetButtonFromMsg(msg, wParam);
-
-    Nova::Input::UpdateButton_(button, true);
-    eventSystem.InvokeEvent<Nova::MouseButtonDownEvent>(button);
-}
-
-static void HandleButtonUp(Nova::EventSystem &eventSystem, UINT msg, WPARAM wParam) noexcept
-{
-    NV_PROFILE_FUNC;
-
-    const auto button = GetButtonFromMsg(msg, wParam);
-
-    Nova::Input::UpdateButton_(button, false);
-    eventSystem.InvokeEvent<Nova::MouseButtonUpEvent>(button);
-}
-
-static void HandleMouseMove(Nova::EventSystem &eventSystem, LPARAM lParam) noexcept
-{
-    NV_PROFILE_FUNC;
-
-    const auto xPos = (double)GET_X_LPARAM(lParam);
-    const auto yPos = (double)GET_Y_LPARAM(lParam);
-
-    const auto xDelta = xPos - Nova::Input::GetMouseX();
-    const auto yDelta = yPos - Nova::Input::GetMouseY();
-
-    Nova::Input::UpdateMousePos_(xPos, yPos);
-    eventSystem.InvokeEvent<Nova::MouseMoveEvent>(xPos, yPos, xDelta, yDelta);
-}
-
-static void HandleScroll(Nova::EventSystem &eventSystem, double vDelta, double hDelta) noexcept
-{
-    NV_PROFILE_FUNC;
-
-    Nova::Input::UpdateMouseScroll_(vDelta, hDelta);
-    eventSystem.InvokeEvent<Nova::MouseScrollEvent>(vDelta, hDelta);
-}
-
-static void HandleKeyUp(Nova::EventSystem &eventSystem, WPARAM wParam, bool isExtended) noexcept
-{
-    NV_PROFILE_FUNC;
-
-    const auto key = TranslateKey(wParam, isExtended);
-    eventSystem.InvokeEvent<Nova::KeyUpEvent>(key);
-}
-
-static void HandleChar(WPARAM wParam) noexcept
-{
-    NV_PROFILE_FUNC;
-
-    Nova::Input::AppendTextChar_(static_cast<wchar_t>(wParam));
-}
-
-static void HandleKeyDown(Nova::EventSystem &eventSystem, WPARAM wParam, bool isExtended, bool isRepeated) noexcept
-{
-    NV_PROFILE_FUNC;
-
-    const auto key = TranslateKey(wParam, isExtended);
-    eventSystem.InvokeEvent<Nova::KeyDownEvent>(key, isRepeated);
-}
-
-static void HandleDropFiles(Nova::EventSystem &eventSystem, HDROP drop) noexcept
-{
-    NV_PROFILE_FUNC;
-
-    const auto pathsCount = DragQueryFileW(drop, static_cast<UINT>(-1), nullptr, 0);
-
-    std::vector<std::filesystem::path> paths;
-    paths.reserve(pathsCount);
-
-    for (UINT i = 0; i < pathsCount; i++)
-    {
-        std::array<wchar_t, MAX_PATH> pathBuf;
-        const auto pathLength = DragQueryFileW(drop, i, pathBuf.data(), pathBuf.size());
-
-        paths.emplace_back(pathBuf.begin(), pathBuf.begin() + pathLength);
-    }
-
-    eventSystem.InvokeEvent<Nova::FileDropEvent>(std::move(paths));
-}
-
 LRESULT CALLBACK Nova::Window::WindowProc(HWND win, UINT msg, WPARAM wParam, LPARAM lParam) noexcept
 {
     NV_PROFILE_FUNC;
@@ -431,57 +345,142 @@ LRESULT Nova::Window::HandleMessage(HWND win, UINT msg, WPARAM wParam, LPARAM lP
     switch (msg)
     {
     case WM_DESTROY:
+    {
         PostQuitMessage(0);
+
         return FALSE;
+    }
     case WM_SIZE:
+    {
         eventSystem_.InvokeEvent<WindowResizeEvent>(LOWORD(lParam), HIWORD(lParam));
+
         return FALSE;
+    }
     case WM_MOVE:
+    {
         eventSystem_.InvokeEvent<WindowMoveEvent>(LOWORD(lParam), HIWORD(lParam));
+
         return FALSE;
+    }
     case WM_CLOSE:
+    {
         data_.shouldClose = true;
         eventSystem_.InvokeEvent<WindowCloseEvent>(0.0);
+
         return FALSE;
+    }
     case WM_KILLFOCUS:
+    {
         eventSystem_.InvokeEvent<WindowFocusEvent>(false);
+
         return FALSE;
+    }
     case WM_SETFOCUS:
+    {
         eventSystem_.InvokeEvent<WindowFocusEvent>(true);
+
         return FALSE;
+    }
     case WM_LBUTTONDOWN:
     case WM_RBUTTONDOWN:
     case WM_MBUTTONDOWN:
     case WM_XBUTTONDOWN:
-        HandleButtonDown(eventSystem_, msg, wParam);
+    {
+        const auto button = GetButtonFromMsg(msg, wParam);
+        inputSystem_.UpdateButton(button, true);
+        eventSystem_.InvokeEvent<Nova::MouseButtonDownEvent>(button);
+
         return msg == WM_XBUTTONDOWN;
+    }
     case WM_LBUTTONUP:
     case WM_RBUTTONUP:
     case WM_MBUTTONUP:
     case WM_XBUTTONUP:
-        HandleButtonUp(eventSystem_, msg, wParam);
+    {
+        const auto button = GetButtonFromMsg(msg, wParam);
+        inputSystem_.UpdateButton(button, false);
+        eventSystem_.InvokeEvent<Nova::MouseButtonUpEvent>(button);
+
         return msg == WM_XBUTTONUP;
+    }
     case WM_MOUSEMOVE:
-        HandleMouseMove(eventSystem_, lParam);
+    {
+        const auto xPos = (double)GET_X_LPARAM(lParam);
+        const auto yPos = (double)GET_Y_LPARAM(lParam);
+
+        const auto [xLast, yLast] = inputSystem_.GetMousePos();
+
+        const auto xDelta = xPos - xLast;
+        const auto yDelta = yPos - yLast;
+
+        inputSystem_.UpdateMousePos(xPos, yPos);
+        eventSystem_.InvokeEvent<Nova::MouseMoveEvent>(xPos, yPos, xDelta, yDelta);
+
         return FALSE;
+    }
     case WM_MOUSEWHEEL:
-        HandleScroll(eventSystem_, GET_WHEEL_DELTA_WPARAM(wParam) / 120.0, 0.0);
+    {
+        const auto delta = GET_WHEEL_DELTA_WPARAM(wParam) / 120.0;
+        inputSystem_.UpdateMouseVScroll(delta);
+        eventSystem_.InvokeEvent<Nova::MouseScrollEvent>(delta, 0.0);
+
         return TRUE;
+    }
     case WM_MOUSEHWHEEL:
-        HandleScroll(eventSystem_, 0.0, GET_WHEEL_DELTA_WPARAM(wParam) / 120.0);
+    {
+        const auto delta = GET_WHEEL_DELTA_WPARAM(wParam) / 120.0;
+        inputSystem_.UpdateMouseHScroll(delta);
+        eventSystem_.InvokeEvent<Nova::MouseScrollEvent>(0.0, delta);
+
         return TRUE;
+    }
     case WM_KEYUP:
-        HandleKeyUp(eventSystem_, wParam, (lParam & (1 << 24)) == lParam);
+    {
+        const auto isExtended = Flag::IsSet(lParam, (1ll << 24));
+        const auto key = TranslateKey(wParam, isExtended);
+
+        inputSystem_.UpdateKey(key, false);
+        eventSystem_.InvokeEvent<Nova::KeyUpEvent>(key);
+
         return FALSE;
+    }
     case WM_KEYDOWN:
-        HandleKeyDown(eventSystem_, wParam, (lParam & (1 << 24)) == lParam, (lParam & 0xFFFF) > 1);
+    {
+        const auto isExtended = Flag::IsSet(lParam, (1ll << 24));
+        const auto isRepeated = (lParam & 0xFFFF) > 1;
+        const auto key = TranslateKey(wParam, isExtended);
+
+        inputSystem_.UpdateKey(key, true);
+        eventSystem_.InvokeEvent<Nova::KeyDownEvent>(key, isRepeated);
+
         return FALSE;
+    }
     case WM_CHAR:
-        HandleChar(wParam);
+    {
+        inputSystem_.AppendTextChar(static_cast<wchar_t>(wParam));
+
         return FALSE;
+    }
     case WM_DROPFILES:
-        HandleDropFiles(eventSystem_, reinterpret_cast<HDROP>(wParam));
+    {
+        auto drop = reinterpret_cast<HDROP>(wParam);
+        const auto pathsCount = DragQueryFileW(drop, static_cast<UINT>(-1), nullptr, 0);
+
+        std::vector<std::filesystem::path> paths;
+        paths.reserve(pathsCount);
+
+        for (UINT i = 0; i < pathsCount; i++)
+        {
+            std::array<wchar_t, MAX_PATH> pathBuf;
+            const auto pathLength = DragQueryFileW(drop, i, pathBuf.data(), pathBuf.size());
+
+            paths.emplace_back(pathBuf.begin(), pathBuf.begin() + pathLength);
+        }
+
+        eventSystem_.InvokeEvent<Nova::FileDropEvent>(std::move(paths));
+
         return FALSE;
+    }
     default:
         return DefWindowProcA(win, msg, wParam, lParam);
     }
@@ -490,8 +489,10 @@ LRESULT Nova::Window::HandleMessage(HWND win, UINT msg, WPARAM wParam, LPARAM lP
 Nova::Window::Window(
     const WindowSettings &settings,
     const StartupData &startupData,
-    EventSystem &eventSystem)
-    : eventSystem_(eventSystem)
+    EventSystem &eventSystem,
+    InputSystem &inputSystem)
+    : eventSystem_(eventSystem),
+      inputSystem_(inputSystem)
 {
     NV_PROFILE_FUNC;
 

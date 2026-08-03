@@ -4,6 +4,7 @@
 #include <Nova/core/StartupData.hpp>
 #include <Nova/core/Flag.hpp>
 #include <Nova/events/EventSystem.hpp>
+#include <Nova/input/InputSystem.hpp>
 #include <memory>
 #include <span>
 #include <optional>
@@ -52,7 +53,8 @@ namespace Nova
         Window(
             const WindowSettings &settings,
             const StartupData &startupData,
-            EventSystem &eventSystem);
+            EventSystem &eventSystem,
+            InputSystem &inputSystem);
 
         void *GetNativeHandle() noexcept;
 
@@ -131,6 +133,7 @@ namespace Nova
     private:
         WindowData data_;
         EventSystem &eventSystem_;
+        InputSystem &inputSystem_;
 
         static LRESULT CALLBACK WindowProc(HWND win, UINT msg, WPARAM wParam, LPARAM lParam) noexcept;
 
