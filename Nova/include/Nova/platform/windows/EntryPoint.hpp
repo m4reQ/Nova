@@ -1,11 +1,13 @@
+#include <Nova/core/Application.hpp>
 #include <Nova/platform/windows/StartupData.hpp>
 #include <Nova/platform/windows/DLL.hpp>
 #include <Windows.h>
 #include <vector>
 #include <string>
 #include <iostream>
+#include <memory>
 
-extern void Run(const Nova::StartupData &args);
+extern std::unique_ptr<Nova::Application> CreateApplication(const Nova::StartupData &startupData);
 
 static std::vector<std::string> GetArgs(int argc, char **argv) noexcept
 {
@@ -23,12 +25,14 @@ int main(int argc, char **argv)
 {
     try
     {
-        Run({
+        const Nova::StartupData startupData{
             .exeInstance = GetModuleHandle(nullptr),
             .libInstance = Nova::DLL::GetHandle(),
             .args = GetArgs(argc, argv),
             .showCommand = SW_SHOW,
-        });
+        };
+        auto application = CreateApplication(startupData);
+        application->Run();
     }
     catch (std::exception e)
     {
@@ -43,12 +47,14 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdLine, int cmd
 {
     try
     {
-        Run({
+        const Nova::StartupData startupData{
             .exeInstance = hInst,
             .libInstance = Nova::DLL::GetHandle(),
             .args = GetArgs(__argc, __argv),
             .showCommand = cmdShow,
-        });
+        };
+        auto application = CreateApplication(startupData);
+        application->Run();
     }
     catch (std::exception e)
     {
