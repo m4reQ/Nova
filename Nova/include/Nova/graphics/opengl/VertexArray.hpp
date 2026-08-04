@@ -1,13 +1,12 @@
 #pragma once
 #include <Nova/graphics/opengl/Buffer.hpp>
-#include <Nova/graphics/opengl/GLObject.hpp>
-#include <Nova/graphics/opengl/ID.hpp>
 #include <Nova/graphics/opengl/VertexDescriptor.hpp>
 #include <vector>
 #include <optional>
 #include <iterator>
 #include <xutility>
 #include <unordered_map>
+#include <glad/gl.h>
 
 namespace Nova
 {
@@ -15,19 +14,19 @@ namespace Nova
 	{
 		GLuint Stride;
 		std::vector<VertexDescriptor> Descriptors;
-		std::optional<BufferID> BufferID = std::nullopt;
+		std::optional<GLuint> BufferID = std::nullopt;
 		GLint Offset = 0;
 		GLint InstanceDivisor = 0;
 	};
 
-	class VertexArray : public GLObject<GL_VERTEX_ARRAY, VertexArrayID>
+	class VertexArray
 	{
 	public:
 		VertexArray() = default;
-		
-		VertexArray(const VertexArray&) = delete;
 
-		VertexArray(VertexArray&& other) noexcept;
+		VertexArray(const VertexArray &) = delete;
+
+		VertexArray(VertexArray &&other) noexcept;
 
 		VertexArray(GLuint id) noexcept;
 
@@ -35,20 +34,20 @@ namespace Nova
 
 		VertexArray(
 			std::span<const VertexInput> layout,
-			const Buffer& elementBuffer);
+			const Buffer &elementBuffer);
 
 		VertexArray(std::initializer_list<VertexInput> layout);
-		
+
 		VertexArray(
 			std::initializer_list<VertexInput> layout,
-			const Buffer& elementBuffer);
+			const Buffer &elementBuffer);
 
 		void AddVertexInput(const VertexInput &vertexInput);
 
 		void AddVertexInput(
 			GLuint stride,
 			const std::vector<VertexDescriptor> &descriptors,
-			BufferID bufferID,
+			GLuint bufferID,
 			GLint offset,
 			GLint instanceDivisor);
 
@@ -60,15 +59,23 @@ namespace Nova
 
 		void BindElementBuffer(const Buffer &buffer) const noexcept;
 
-		void Delete() noexcept override;
+		void Delete() noexcept;
 
-		VertexArray& operator=(const VertexArray&) = delete;
-		
-		VertexArray& operator=(VertexArray&& other) noexcept;
+		VertexArray &operator=(const VertexArray &) = delete;
+
+		VertexArray &operator=(VertexArray &&other) noexcept
+		{
+			bufferBindings_ = std::move(other.bufferBindings_);
+			usedBufferBindings_ = std::move(other.usedBufferBindings_);
+			id_ = std::exchange(other.id_, 0);
+
+			return *this;
+		}
 
 	private:
-		std::unordered_map<GLuint, GLuint> m_BufferBindings;
-		std::vector<GLuint> m_UsedBufferBindings;
+		std::unordered_map<GLuint, GLuint> bufferBindings_;
+		std::vector<GLuint> usedBufferBindings_;
+		GLuint id_;
 
 		GLuint FindNextFreeBindingIndex();
 	};

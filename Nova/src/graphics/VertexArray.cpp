@@ -1,12 +1,12 @@
 #include <Nova/graphics/opengl/VertexArray.hpp>
 #include <Nova/graphics/opengl/GL.hpp>
-#include <Nova/core/Build.hpp>
 #include <Nova/debug/Profile.hpp>
 #include <Nova/debug/Log.hpp>
+#include <Nova/core/Build.hpp>
 
 using namespace Nova;
 
-static constexpr const std::string_view AttribTypeToString(AttributeType type)
+static constexpr const std::string_view AttribTypeToString(AttributeType type) noexcept
 {
 	switch (type)
 	{
@@ -42,26 +42,20 @@ static constexpr const std::string_view AttribTypeToString(AttributeType type)
 }
 
 VertexArray::VertexArray(VertexArray &&other) noexcept
-	: GLObject::GLObject(std::exchange(other.m_ID, 0))
-{
-	RegisterObject(GL_VERTEX_ARRAY, m_ID);
-}
+	: bufferBindings_(std::move(other.bufferBindings_)),
+	  usedBufferBindings_(std::move(other.usedBufferBindings_)),
+	  id_(std::exchange(other.id_, 0)) {}
 
 VertexArray::VertexArray(GLuint id) noexcept
-	: GLObject::GLObject(id)
-{
-	RegisterObject(GL_VERTEX_ARRAY, m_ID);
-}
+	: id_(id) {}
 
 VertexArray::VertexArray(std::span<const VertexInput> layout)
-	: GLObject::GLObject(GL::CreateVertexArray())
+	: id_(GL::CreateVertexArray())
 {
 	NV_PROFILE_FUNC;
 
 	for (const auto &vertexInput : layout)
 		AddVertexInput(vertexInput);
-
-	RegisterObject(GL_VERTEX_ARRAY, m_ID);
 }
 
 VertexArray::VertexArray(
@@ -69,7 +63,7 @@ VertexArray::VertexArray(
 	const Buffer &elementBuffer)
 	: VertexArray(layout)
 {
-	GL::VertexArrayElementBuffer(m_ID, (GLuint)elementBuffer.GetID());
+	GL::VertexArrayElementBuffer(id_, elementBuffer.GetID());
 }
 
 VertexArray::VertexArray(std::initializer_list<VertexInput> layout)
@@ -85,7 +79,7 @@ void VertexArray::AddVertexInput(const VertexInput &vertexInput)
 	AddVertexInput(
 		vertexInput.Stride,
 		vertexInput.Descriptors,
-		vertexInput.BufferID.value_or(BufferID(0)),
+		vertexInput.BufferID.value_or(0),
 		vertexInput.Offset,
 		vertexInput.InstanceDivisor);
 }
@@ -93,21 +87,21 @@ void VertexArray::AddVertexInput(const VertexInput &vertexInput)
 void VertexArray::AddVertexInput(
 	GLuint stride,
 	const std::vector<VertexDescriptor> &descriptors,
-	BufferID bufferID,
+	GLuint bufferID,
 	GLint offset,
 	GLint instanceDivisor)
 {
 	NV_PROFILE_FUNC;
 
 	GLuint bindingIndex;
-	const auto &bindingEntry = m_BufferBindings.find((GLuint)bufferID);
-	if (bindingEntry == m_BufferBindings.end())
+	const auto &bindingEntry = bufferBindings_.find(bufferID);
+	if (bindingEntry == bufferBindings_.end())
 	{
-		NV_LOG_WARNING("Vertex array {} is using automatic buffer binding resolution for buffer {}. To speed this up consider selecting buffer binding before using BindVertexBuffer or manually specify the binding.", (GLuint)m_ID, (GLuint)bufferID);
+		NV_LOG_WARNING("Vertex array {} is using automatic buffer binding resolution for buffer {}. To speed this up consider selecting buffer binding before using BindVertexBuffer or manually specify the binding.", (GLuint)id_, (GLuint)bufferID);
 
 		bindingIndex = FindNextFreeBindingIndex();
-		m_BufferBindings[(GLuint)bufferID] = bindingIndex;
-		m_UsedBufferBindings.emplace_back(bindingIndex);
+		bufferBindings_[bufferID] = bindingIndex;
+		usedBufferBindings_.emplace_back(bindingIndex);
 	}
 	else
 	{
@@ -115,17 +109,17 @@ void VertexArray::AddVertexInput(
 	}
 
 	GL::VertexArrayVertexBuffer(
-		m_ID,
+		id_,
 		bindingIndex,
-		(GLuint)bufferID,
+		bufferID,
 		offset,
 		stride);
 	GL::VertexArrayBindingDivisor(
-		m_ID,
+		id_,
 		bindingIndex,
 		instanceDivisor);
 
-	NV_LOG_TRACE("VertexArray({}) Bound vertex buffer {} at index {}.", (GLuint)m_ID, (GLuint)bufferID, bindingIndex);
+	NV_LOG_TRACE("VertexArray({}) Bound vertex buffer {} at index {}.", (GLuint)id_, (GLuint)bufferID, bindingIndex);
 
 	GLuint attribOffset = 0;
 	for (const auto &descriptor : descriptors)
@@ -137,14 +131,14 @@ void VertexArray::AddVertexInput(
 			const auto attribIndex = descriptor.AttributeIndex + row;
 			const auto offset = attribOffset + (row * descriptor.GetRowSize());
 
-			GL::EnableVertexArrayAttrib(m_ID, attribIndex);
-			GL::VertexArrayAttribBinding(m_ID, attribIndex, bindingIndex);
+			GL::EnableVertexArrayAttrib(id_, attribIndex);
+			GL::VertexArrayAttribBinding(id_, attribIndex, bindingIndex);
 
 			switch (descriptor.AttributeType)
 			{
 			case AttributeType::Double:
 				glVertexArrayAttribLFormat(
-					(GLuint)m_ID,
+					id_,
 					attribIndex,
 					descriptor.Count,
 					(GLenum)descriptor.AttributeType,
@@ -154,7 +148,7 @@ void VertexArray::AddVertexInput(
 			case AttributeType::Float:
 			case AttributeType::HalfFloat:
 				glVertexArrayAttribFormat(
-					(GLuint)m_ID,
+					id_,
 					attribIndex,
 					descriptor.Count,
 					(GLenum)descriptor.AttributeType,
@@ -163,7 +157,7 @@ void VertexArray::AddVertexInput(
 				break;
 			default:
 				glVertexArrayAttribIFormat(
-					(GLuint)m_ID,
+					id_,
 					attribIndex,
 					descriptor.Count,
 					(GLenum)descriptor.AttributeType,
@@ -174,7 +168,7 @@ void VertexArray::AddVertexInput(
 
 		NV_LOG_TRACE(
 			"VertexArray({}) Added vertex descriptor for buffer binding {}.\n\tIndex: {}\n\tOffset: {}\n\tType: {}\n\tCount: {}\n\tRows: {}\n\tNormalized: {}",
-			(GLuint)m_ID,
+			id_,
 			bindingIndex,
 			descriptor.AttributeIndex,
 			attribOffset,
@@ -191,49 +185,43 @@ void VertexArray::Use() const noexcept
 {
 	NV_PROFILE_FUNC;
 
-	GL::BindVertexArray(m_ID);
+	GL::BindVertexArray(id_);
 }
 
 void VertexArray::BindVertexBuffer(const Buffer &buffer, GLuint bindingIndex, GLsizei stride, GLintptr offset)
 {
-	const auto &bindingEntry = m_BufferBindings.find((GLuint)buffer.GetID());
-	if (bindingEntry != m_BufferBindings.end())
+	const auto &bindingEntry = bufferBindings_.find((GLuint)buffer.GetID());
+	if (bindingEntry != bufferBindings_.end())
 	{
-		m_UsedBufferBindings.erase(
+		usedBufferBindings_.erase(
 			std::remove(
-				m_UsedBufferBindings.begin(),
-				m_UsedBufferBindings.end(),
+				usedBufferBindings_.begin(),
+				usedBufferBindings_.end(),
 				bindingEntry->second));
 
 		// NV_LOG_WARNING("Buffer with ID {} is already bound to binding index {}. Buffer will be rebound.", (GLuint)buffer.GetID(), bindingEntry->second);
 	}
 
-	m_BufferBindings[(GLuint)buffer.GetID()] = bindingIndex;
-	m_UsedBufferBindings.emplace_back(bindingIndex);
-	GL::VertexArrayVertexBuffer(m_ID, bindingIndex, (GLuint)buffer.GetID(), offset, stride);
+	bufferBindings_[(GLuint)buffer.GetID()] = bindingIndex;
+	usedBufferBindings_.emplace_back(bindingIndex);
+	GL::VertexArrayVertexBuffer(id_, bindingIndex, (GLuint)buffer.GetID(), offset, stride);
 }
 
 void VertexArray::BindVertexBuffer(const Buffer &buffer, GLuint bindingIndex, GLsizei stride, GLintptr offset, GLuint instanceDivisor)
 {
 	BindVertexBuffer(buffer, bindingIndex, stride, offset);
-	GL::VertexArrayBindingDivisor(m_ID, bindingIndex, instanceDivisor);
+	GL::VertexArrayBindingDivisor(id_, bindingIndex, instanceDivisor);
 }
 
 void VertexArray::BindElementBuffer(const Buffer &buffer) const noexcept
 {
-	GL::VertexArrayElementBuffer(m_ID, (GLuint)buffer.GetID());
+	GL::VertexArrayElementBuffer(id_, (GLuint)buffer.GetID());
 }
 
 void VertexArray::Delete() noexcept
 {
-	glDeleteVertexArrays(1, &m_ID);
-	m_ID = 0;
-}
-
-VertexArray &VertexArray::operator=(VertexArray &&other) noexcept
-{
-	m_ID = std::exchange(other.m_ID, 0);
-	return *this;
+	glDeleteVertexArrays(1, &id_);
+	id_ = 0;
 }
 
 GLuint VertexArray::FindNextFreeBindingIndex()
@@ -244,9 +232,9 @@ GLuint VertexArray::FindNextFreeBindingIndex()
 	for (GLuint i = 0; i < maxBindingsCount; i++)
 	{
 		const auto bindingUnused = std::find(
-									   m_UsedBufferBindings.begin(),
-									   m_UsedBufferBindings.end(),
-									   i) == m_UsedBufferBindings.end();
+									   usedBufferBindings_.begin(),
+									   usedBufferBindings_.end(),
+									   i) == usedBufferBindings_.end();
 		if (bindingUnused)
 			return i;
 	}
