@@ -1228,6 +1228,26 @@ namespace Nova
         {
             glObjectPtrLabel(ptr, static_cast<GLsizei>(label.length()), label.data());
         }
+
+        /// @brief Set the viewport.
+        /// @param x Specify the left edge of the viewport rectangle, in pixels. Initially 0.
+        /// @param y Specify the bottom edge of the viewport rectangle, in pixels. Initially 0.
+        /// @param width Specify the width of the viewport. When a GL context is first attached to a window, width and height are set to the dimensions of that window.
+        /// @param height Specify the height of the viewport. When a GL context is first attached to a window, width and height are set to the dimensions of that window.
+        inline void Viewport(GLint x, GLint y, unsigned int width, unsigned int height) noexcept
+        {
+            glViewport(x, y, width, height);
+        }
+
+        /// @brief Define the scissor box.
+        /// @param x Specify the left edge of the scissor box. Initially 0.
+        /// @param y Specify the bottom edge of the scissor box. Initially 0.
+        /// @param width Specify the width of the scissor box. When a GL context is first attached to a window, width and height are set to the dimensions of that window.
+        /// @param height Specify the height of the scissor box. When a GL context is first attached to a window, width and height are set to the dimensions of that window.
+        inline void Scissor(GLint x, GLint y, unsigned int width, unsigned int height) noexcept
+        {
+            glScissor(x, y, width, height);
+        }
     }
 
     template <std::integral T>
