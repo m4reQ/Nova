@@ -25,6 +25,8 @@ namespace Nova
 
         void LoadGL();
 
+        double GetRefreshRate();
+
         GLContext &operator=(const GLContext &) = delete;
 
         GLContext &operator=(GLContext &&) noexcept = default;

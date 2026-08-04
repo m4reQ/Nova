@@ -136,3 +136,8 @@ void Nova::GLContext::LoadGL()
     if (!gladLoadGL(reinterpret_cast<GLADloadfunc>(wglGetProcAddress)))
         throw std::runtime_error("Failed to load OpenGL function pointers.");
 }
+
+double Nova::GLContext::GetRefreshRate()
+{
+    return static_cast<double>(GetDeviceCaps(data_.deviceContext, VREFRESH));
+}
