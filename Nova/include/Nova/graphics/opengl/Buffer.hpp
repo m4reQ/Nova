@@ -1,6 +1,4 @@
 #pragma once
-#include <Nova/graphics/opengl/GLObject.hpp>
-#include <Nova/graphics/opengl/ID.hpp>
 #include <Nova/graphics/opengl/BufferView.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <span>
@@ -40,7 +38,7 @@ namespace Nova
 		ReadWrite = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT,
 	};
 
-	class Buffer : public GLObject<GL_BUFFER, BufferID>
+	class Buffer
 	{
 	public:
 		Buffer() = default;
@@ -50,27 +48,27 @@ namespace Nova
 			bool isReadable = false,
 			const void *data = nullptr);
 
-		void Delete() noexcept override;
+		void Delete() noexcept;
 
 		template <typename T = void>
 		constexpr BufferView<T> GetView(GLsizeiptr size = (GLsizeiptr)-1, GLintptr offset = 0)
 		{
-			return BufferView<T>(m_ID, m_BaseDataPtr, size, offset);
+			return BufferView<T>(id_, baseDataPtr_, size, offset);
 		}
-		
-		constexpr void *GetDataPtr() noexcept { return m_DataPtr; }
 
-		constexpr const void *GetDataPtr() const noexcept { return m_DataPtr; }
+		constexpr void *GetDataPtr() noexcept { return dataPtr_; }
 
-		template <typename T>
-		constexpr T *GetDataPtr() noexcept { return reinterpret_cast<T *>(m_DataPtr); }
+		constexpr const void *GetDataPtr() const noexcept { return dataPtr_; }
 
 		template <typename T>
-		constexpr const T *GetDataPtr() noexcept { return reinterpret_cast<const T *>(m_DataPtr); }
+		constexpr T *GetDataPtr() noexcept { return reinterpret_cast<T *>(dataPtr_); }
+
+		template <typename T>
+		constexpr const T *GetDataPtr() noexcept { return reinterpret_cast<const T *>(dataPtr_); }
 
 		void Store(const void *data, std::size_t sizeBytes) noexcept;
 
-		void Reset() { m_DataPtr = m_BaseDataPtr; }
+		void Reset() { dataPtr_ = baseDataPtr_; }
 
 		template <typename T>
 		void Store(std::span<T> data)
@@ -83,7 +81,7 @@ namespace Nova
 			glm::length_t R,
 			typename T,
 			glm::qualifier Q = glm::qualifier::defaultp>
-		void Store(const glm::mat<C, R, T, Q>& matrix)
+		void Store(const glm::mat<C, R, T, Q> &matrix)
 		{
 			Store(glm::value_ptr(matrix), sizeof(matrix));
 		}
@@ -92,7 +90,7 @@ namespace Nova
 			glm::length_t L,
 			typename T,
 			glm::qualifier Q = glm::qualifier::defaultp>
-		void Store(const glm::vec<L, T, Q>& vector)
+		void Store(const glm::vec<L, T, Q> &vector)
 		{
 			Store(glm::value_ptr(vector), sizeof(vector));
 		}
@@ -100,7 +98,7 @@ namespace Nova
 		template <
 			typename T,
 			glm::qualifier Q = glm::qualifier::defaultp>
-		void Store(const glm::qua<T, Q>& quaternion)
+		void Store(const glm::qua<T, Q> &quaternion)
 		{
 			Store(glm::value_ptr(quaternion), sizeof(quaternion));
 		}
@@ -117,19 +115,22 @@ namespace Nova
 
 		void AdvanceDataPtr(GLsizeiptr nBytes) noexcept;
 
-		constexpr GLsizeiptr GetDataSize() const noexcept { return (std::uint8_t *)m_DataPtr - (std::uint8_t *)m_BaseDataPtr; }
+		constexpr GLsizeiptr GetDataSize() const noexcept { return (std::uint8_t *)dataPtr_ - (std::uint8_t *)baseDataPtr_; }
 
-		constexpr GLsizeiptr GetSize() const noexcept { return m_Size; }
+		constexpr GLsizeiptr GetSize() const noexcept { return size_; }
 
-		constexpr bool IsReadable() const noexcept { return m_IsReadable; }
+		constexpr GLuint GetID() const noexcept { return id_; }
 
-		constexpr bool IsWritable() const noexcept { return m_IsWritable; }
+		constexpr bool IsReadable() const noexcept { return isReadable_; }
+
+		constexpr bool IsWritable() const noexcept { return isWritable_; }
 
 	private:
-		void *m_BaseDataPtr = nullptr;
-		void *m_DataPtr = nullptr;
-		GLsizeiptr m_Size;
-		bool m_IsReadable;
-		bool m_IsWritable;
+		void *baseDataPtr_ = nullptr;
+		void *dataPtr_ = nullptr;
+		GLsizeiptr size_;
+		GLuint id_;
+		bool isReadable_;
+		bool isWritable_;
 	};
 }
