@@ -11,6 +11,21 @@ namespace Nova
 {
     // TODO Add implicit casts to GLenum for strong typed enumerations
 
+    enum class ObjectIdentifier : GLenum
+    {
+        Buffer = GL_BUFFER,
+        Shader = GL_SHADER,
+        Program = GL_PROGRAM,
+        VertexArray = GL_VERTEX_ARRAY,
+        Query = GL_QUERY,
+        ProgramPipeline = GL_PROGRAM_PIPELINE,
+        TransformFeedback = GL_TRANSFORM_FEEDBACK,
+        Sampler = GL_SAMPLER,
+        Texture = GL_TEXTURE,
+        Renderbuffer = GL_RENDERBUFFER,
+        Framebuffer = GL_FRAMEBUFFER
+    };
+
     /// @brief Specifies a symbolic constant used to retrieve string information about current OpenGL connection.
     enum class StringName : GLenum
     {
@@ -1195,6 +1210,23 @@ namespace Nova
         inline std::string_view GetString(GLuint index) noexcept
         {
             return reinterpret_cast<const char *>(glGetStringi(GL_EXTENSIONS, index));
+        }
+
+        /// @brief Label a named object identified within a namespace.
+        /// @param identifier The namespace from which the name of the object is allocated.
+        /// @param name The name of the object to label.
+        /// @param label The string containing the label to assign to the object.
+        inline void ObjectLabel(ObjectIdentifier identifier, GLuint name, const std::string_view label) noexcept
+        {
+            glObjectLabel(static_cast<GLenum>(identifier), name, static_cast<GLsizei>(label.length()), label.data());
+        }
+
+        /// @brief Label a sync object identified by a pointer.
+        /// @param ptr A pointer identifying a sync object.
+        /// @param label The string containing the label to assign to the object.
+        inline void ObjectLabel(GLsync ptr, const std::string_view label) noexcept
+        {
+            glObjectPtrLabel(ptr, static_cast<GLsizei>(label.length()), label.data());
         }
     }
 
