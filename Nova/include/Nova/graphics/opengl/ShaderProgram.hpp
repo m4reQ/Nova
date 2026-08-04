@@ -84,6 +84,8 @@ namespace Nova
 
 		void SetUniform(const std::string_view name, GLuint64 value) const;
 
+		void SetDebugName(const std::string_view name) const noexcept;
+
 		GLuint GetResourceLocation(const std::string_view name) const;
 
 		std::optional<GLuint> TryGetResourceLocation(const std::string_view name) const;

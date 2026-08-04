@@ -376,3 +376,8 @@ void ShaderProgram::SetUniform(const std::string_view name, GLuint64 value) cons
 	NV_PROFILE_FUNC;
 	glProgramUniformHandleui64ARB(id_, GetResourceLocation(name), value);
 }
+
+void ShaderProgram::SetDebugName(const std::string_view name) const noexcept
+{
+	GL::ObjectLabel(ObjectIdentifier::Program, id_, name);
+}
