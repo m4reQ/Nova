@@ -19,11 +19,19 @@ namespace Nova
 
         WindowClass(const WindowClass &) = delete;
 
-        WindowClass(WindowClass &&) noexcept = default;
+        WindowClass(WindowClass &&other) noexcept
+            : class_(std::exchange(other.class_, static_cast<unsigned short>(0))),
+              hInstance_(std::exchange(other.hInstance_, nullptr)) {}
 
         WindowClass &operator=(const WindowClass &) = delete;
 
-        WindowClass &operator=(WindowClass &&) noexcept = default;
+        constexpr WindowClass &operator=(WindowClass &&other) noexcept
+        {
+            class_ = std::exchange(other.class_, static_cast<unsigned short>(0));
+            hInstance_ = std::exchange(other.hInstance_, nullptr);
+
+            return *this;
+        }
 
         ~WindowClass() noexcept;
 
@@ -31,7 +39,7 @@ namespace Nova
 
         constexpr HINSTANCE GetInstance() const noexcept { return hInstance_; }
 
-        constexpr ATOM Reset() noexcept { return std::exchange(class_, 0); }
+        constexpr ATOM Reset() noexcept { return std::exchange(class_, static_cast<unsigned short>(0)); }
 
         constexpr operator ATOM() const noexcept { return Get(); }
 
