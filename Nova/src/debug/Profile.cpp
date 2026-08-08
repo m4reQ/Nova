@@ -140,7 +140,7 @@ void Profile::_WriteProfileEvent(const std::string_view eventName) noexcept
             std::this_thread::get_id()));
 }
 
-void Profile::_WriteProfileCounter(const std::string_view counterName, float value) noexcept
+void Profile::_WriteProfileCounter(const std::string_view counterName, double value) noexcept
 {
     if (!s_IsEnabled || !IsSessionRunning())
     {

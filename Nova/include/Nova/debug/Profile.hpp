@@ -6,7 +6,7 @@
 #ifdef NV_DEBUG
 #define NV_PROFILE_SET_ENABLED(isEnabled) Nova::Profile::SetEnabled(isEnabled)
 #define NV_PROFILE_FUNC const Nova::_ProfileFrame _profileFrame(__FUNCTION__)
-#define NV_PROFILE_SCOPE(name) const Nova::_ProfileFrame _profileFrame(name)
+#define NV_PROFILE_SCOPE(name) const Nova::_ProfileFrame _profileFrame##__LINE__(name)
 #define NV_PROFILE_EVENT(name) Nova::Profile::_WriteProfileEvent(name)
 #define NV_PROFILE_COUNTER(name, value) Nova::Profile::_WriteProfileCounter(name, value)
 #define NV_PROFILE_BEGIN_SESSION(filepath) Nova::Profile::BeginSession(filepath)
@@ -58,7 +58,7 @@ namespace Nova
 
         void _WriteProfileEvent(const std::string_view eventName) noexcept;
 
-        void _WriteProfileCounter(const std::string_view counterName, float value) noexcept;
+        void _WriteProfileCounter(const std::string_view counterName, double value) noexcept;
 
         void _SetCurrentThreadName(const std::string_view threadName) noexcept;
 
