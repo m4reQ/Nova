@@ -3,6 +3,7 @@
 #include <Nova/debug/Profile.hpp>
 #include <Nova/core/Build.hpp>
 #include <Nova/core/Memory.hpp>
+#include <Nova/utils/Unicode.hpp>
 #include <dotnet/hostfxr.h>
 #include <dotnet/coreclr_delegates.h>
 #include <dotnet/error_codes.h>
@@ -35,12 +36,12 @@ typedef bool (*ManagedUploadInternalCallsFn)(uint32_t typeID, InternalCallUpload
 typedef bool (*ManagedInvokeStaticMethodFn)(int32_t methodHash, void *resultPtr, const void **argsPtr);
 
 // GarbageCollector
-typedef void(*ManagedCollectGarbageFn)(int32_t generation, uint32_t collectionMode, bool blocking, bool compacting);
-typedef void(*ManagedWaitForPendingFinalizersFn)(void);
-typedef void(*ManagedFreeGCHandleFn)(uint32_t handle);
+typedef void (*ManagedCollectGarbageFn)(int32_t generation, uint32_t collectionMode, bool blocking, bool compacting);
+typedef void (*ManagedWaitForPendingFinalizersFn)(void);
+typedef void (*ManagedFreeGCHandleFn)(uint32_t handle);
 
 constexpr const char *c_HostfxrDllName = "hostfxr.dll";
-constexpr const wchar_t* c_NovaHostFilepath = L"./NovaHost.dll";
+constexpr const wchar_t *c_NovaHostFilepath = L"./NovaHost.dll";
 
 static hostfxr_handle s_HostfxrHandle;
 static HMODULE s_HostfxrLibrary;
@@ -81,7 +82,7 @@ static std::filesystem::path GetHostfxrBasePath()
 	return std::filesystem::path(programFilesPath.Get()) / "dotnet" / "host" / "fxr";
 }
 
-static HMODULE LoadDynamicLibrary(const std::filesystem::path& path)
+static HMODULE LoadDynamicLibrary(const std::filesystem::path &path)
 {
 	auto result = LoadLibraryW(path.wstring().c_str());
 	if (result == nullptr)
@@ -97,78 +98,78 @@ static constexpr const std::string_view HostfxrStatusToString(StatusCode status)
 {
 	switch (status)
 	{
-		case Success:
-			return "Success";
-		case Success_HostAlreadyInitialized:
-			return "Success_HostAlreadyInitialized";
-		case Success_DifferentRuntimeProperties:
-			return "Success_DifferentRuntimeProperties";
-		case InvalidArgFailure:
-			return "InvalidArgFailure";
-		case CoreHostLibLoadFailure:
-			return "CoreHostLibLoadFailure";
-		case CoreHostLibMissingFailure:
-			return "CoreHostLibMissingFailure";
-		case CoreHostEntryPointFailure:
-			return "CoreHostEntryPointFailure";
-		case CurrentHostFindFailure:
-			return "CurrentHostFindFailure";
-		case CoreClrResolveFailure:
-			return "CoreClrResolveFailure";
-		case CoreClrBindFailure:
-			return "CoreClrBindFailure";
-		case CoreClrInitFailure:
-			return "CoreClrInitFailure";
-		case CoreClrExeFailure:
-			return "CoreClrExeFailure";
-		case ResolverInitFailure:
-			return "ResolverInitFailure";
-		case ResolverResolveFailure:
-			return "ResolverResolveFailure";
-		case LibHostInitFailure:
-			return "LibHostInitFailure";
-		case LibHostInvalidArgs:
-			return "LibHostInvalidArgs";
-		case InvalidConfigFile:
-			return "InvalidConfigFile";
-		case AppArgNotRunnable:
-			return "AppArgNotRunnable";
-		case AppHostExeNotBoundFailure:
-			return "AppHostExeNotBoundFailure";
-		case FrameworkMissingFailure:
-			return "FrameworkMissingFailure";
-		case HostApiFailed:
-			return "HostApiFailed";
-		case HostApiBufferTooSmall:
-			return "HostApiBufferTooSmall";
-		case AppPathFindFailure:
-			return "AppPathFindFailure";
-		case SdkResolveFailure:
-			return "SdkResolveFailure";
-		case FrameworkCompatFailure:
-			return "FrameworkCompatFailure";
-		case FrameworkCompatRetry:
-			return "FrameworkCompatRetry";
-		case BundleExtractionFailure:
-			return "BundleExtractionFailure";
-		case BundleExtractionIOError:
-			return "BundleExtractionIOError";
-		case LibHostDuplicateProperty:
-			return "LibHostDuplicateProperty";
-		case HostApiUnsupportedVersion:
-			return "HostApiUnsupportedVersion";
-		case HostInvalidState:
-			return "HostInvalidState";
-		case HostPropertyNotFound:
-			return "HostPropertyNotFound";
-		case HostIncompatibleConfig:
-			return "HostIncompatibleConfig";
-		case HostApiUnsupportedScenario:
-			return "HostApiUnsupportedScenario";
-		case HostFeatureDisabled:
-			return "HostFeatureDisabled";
-		default:
-			return "UnknownStatus";
+	case Success:
+		return "Success";
+	case Success_HostAlreadyInitialized:
+		return "Success_HostAlreadyInitialized";
+	case Success_DifferentRuntimeProperties:
+		return "Success_DifferentRuntimeProperties";
+	case InvalidArgFailure:
+		return "InvalidArgFailure";
+	case CoreHostLibLoadFailure:
+		return "CoreHostLibLoadFailure";
+	case CoreHostLibMissingFailure:
+		return "CoreHostLibMissingFailure";
+	case CoreHostEntryPointFailure:
+		return "CoreHostEntryPointFailure";
+	case CurrentHostFindFailure:
+		return "CurrentHostFindFailure";
+	case CoreClrResolveFailure:
+		return "CoreClrResolveFailure";
+	case CoreClrBindFailure:
+		return "CoreClrBindFailure";
+	case CoreClrInitFailure:
+		return "CoreClrInitFailure";
+	case CoreClrExeFailure:
+		return "CoreClrExeFailure";
+	case ResolverInitFailure:
+		return "ResolverInitFailure";
+	case ResolverResolveFailure:
+		return "ResolverResolveFailure";
+	case LibHostInitFailure:
+		return "LibHostInitFailure";
+	case LibHostInvalidArgs:
+		return "LibHostInvalidArgs";
+	case InvalidConfigFile:
+		return "InvalidConfigFile";
+	case AppArgNotRunnable:
+		return "AppArgNotRunnable";
+	case AppHostExeNotBoundFailure:
+		return "AppHostExeNotBoundFailure";
+	case FrameworkMissingFailure:
+		return "FrameworkMissingFailure";
+	case HostApiFailed:
+		return "HostApiFailed";
+	case HostApiBufferTooSmall:
+		return "HostApiBufferTooSmall";
+	case AppPathFindFailure:
+		return "AppPathFindFailure";
+	case SdkResolveFailure:
+		return "SdkResolveFailure";
+	case FrameworkCompatFailure:
+		return "FrameworkCompatFailure";
+	case FrameworkCompatRetry:
+		return "FrameworkCompatRetry";
+	case BundleExtractionFailure:
+		return "BundleExtractionFailure";
+	case BundleExtractionIOError:
+		return "BundleExtractionIOError";
+	case LibHostDuplicateProperty:
+		return "LibHostDuplicateProperty";
+	case HostApiUnsupportedVersion:
+		return "HostApiUnsupportedVersion";
+	case HostInvalidState:
+		return "HostInvalidState";
+	case HostPropertyNotFound:
+		return "HostPropertyNotFound";
+	case HostIncompatibleConfig:
+		return "HostIncompatibleConfig";
+	case HostApiUnsupportedScenario:
+		return "HostApiUnsupportedScenario";
+	case HostFeatureDisabled:
+		return "HostFeatureDisabled";
+	default:
+		return "UnknownStatus";
 	}
 
 	NV_UNREACHABLE;
@@ -193,7 +194,7 @@ static std::filesystem::path GetHostfxrPath(const std::string_view version)
 		const auto result = dir.path() / c_HostfxrDllName;
 		if (!std::filesystem::exists(result))
 			throw std::runtime_error("Found hostfxr directory candidate but no hostfxr dll inside.");
-		
+
 		NV_LOG_TRACE("Using hostfxr dll: {}", result.string());
 		return result;
 	}
@@ -201,30 +202,30 @@ static std::filesystem::path GetHostfxrPath(const std::string_view version)
 	throw std::runtime_error("Failed to find hostfxr path.");
 }
 
-static void* LoadHostFxrFunctionPtr(const std::string_view funcName)
+static void *LoadHostFxrFunctionPtr(const std::string_view funcName)
 {
 	auto ptr = GetProcAddress(s_HostfxrLibrary, funcName.data());
 	NV_CHECK(ptr, "Failed to load hostfxr library function.");
 
-	NV_LOG_TRACE("Loaded hostfxr library function \"{}\" ({}).", funcName, (void*)ptr);
+	NV_LOG_TRACE("Loaded hostfxr library function \"{}\" ({}).", funcName, (void *)ptr);
 
 	return ptr;
 }
 
-static void* LoadRuntimeDelegate(hostfxr_handle handle, hostfxr_delegate_type type)
+static void *LoadRuntimeDelegate(hostfxr_handle handle, hostfxr_delegate_type type)
 {
 	void *ptr = nullptr;
-	const auto status = HostfxrGetRuntimeDelegate(handle, type, &ptr);
+	[[maybe_unused]] const auto status = HostfxrGetRuntimeDelegate(handle, type, &ptr);
 	NV_CHECK(status == Success, "Failed to load hostfxr runtime delegate.");
 
 	return ptr;
 }
 
-static void* LoadManagedFunctionPtr(const std::wstring_view typeName, const std::wstring_view methodName)
+static void *LoadManagedFunctionPtr(const std::wstring_view typeName, const std::wstring_view methodName)
 {
 	NV_PROFILE_FUNC;
 
-	void* ptr = nullptr;
+	void *ptr = nullptr;
 	const auto status = HostfxrLoadAssemblyAndGetFunctionPointer(
 		c_NovaHostFilepath,
 		typeName.data(),
@@ -271,11 +272,11 @@ static void InitializeManagedEnvironment()
 	NV_PROFILE_FUNC;
 
 	ManagedHostInitialize(
-		[](int level, const DotnetANSIString msg)
+		[](int, [[maybe_unused]] const DotnetANSIString msg)
 		{
 			NV_LOG_TRACE(".NET: {}", msg.GetView());
 		},
-		[](const DotnetANSIString msg, bool isFatal)
+		[]([[maybe_unused]] const DotnetANSIString msg, bool)
 		{
 			NV_LOG_ERROR(msg.GetView());
 		});
@@ -290,12 +291,12 @@ static void InitializeHostfxrEnvironment(const std::filesystem::path &configPath
 	NV_LOG_TRACE("Using .NET runtime config file \"{}\".", std::filesystem::absolute(configPath).string());
 
 	HostfxrSetErrorWriter(
-		[](const auto msg)
+		[]([[maybe_unused]] const char_t *msg)
 		{
-			std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-			const auto msgConv = converter.to_bytes(msg);
-
-			NV_LOG_ERROR("Hostfxr error occurred: {}", msgConv);
+			if constexpr (std::is_same_v<char_t, wchar_t>)
+				NV_LOG_ERROR("Hostfxr error occurred: {}", Unicode::WCharToMultibyte(msg));
+			else
+				NV_LOG_ERROR("Hostfxr error occurred: {}", msg);
 		});
 
 	const auto status = (StatusCode)HostfxrInitializeForRuntimeConfig(configPath.c_str(), nullptr, &s_HostfxrHandle);
@@ -332,7 +333,7 @@ static void LoadHostfxrLibraryFunctions()
 	NV_LOG_TRACE("Loaded hostfxr library functions.");
 }
 
-static void LoadHostfxrLibrary(const std::filesystem::path& filepath)
+static void LoadHostfxrLibrary(const std::filesystem::path &filepath)
 {
 	NV_PROFILE_FUNC;
 
@@ -372,11 +373,11 @@ void Dotnet::Shutdown_() noexcept
 	NV_LOG_TRACE(".NET host shut down.");
 }
 
-AssemblyInfo Dotnet::LoadAssemblyFromFilepath_(const std::filesystem::path& filepath)
+AssemblyInfo Dotnet::LoadAssemblyFromFilepath_(const std::filesystem::path &filepath)
 {
 	NV_PROFILE_FUNC;
 	NV_CHECK(ManagedLoadAssemblyFromFilepath != nullptr, ".NET host is not initialized.");
-	
+
 	NV_LOG_TRACE("Loading .NET assembly from \"{}\"...", filepath.string());
 
 	auto info = ManagedLoadAssemblyFromFilepath(DotnetUTF8String(filepath.c_str(), true));
@@ -394,7 +395,7 @@ AssemblyInfo Dotnet::LoadAssemblyFromFilepath_(const std::filesystem::path& file
 	return info;
 }
 
-AssemblyInfo Dotnet::LoadAssemblyFromMemory_(const std::span<uint8_t> data)
+AssemblyInfo Dotnet::LoadAssemblyFromMemory_(const std::span<uint8_t>)
 {
 	NV_PROFILE_FUNC;
 
@@ -406,9 +407,9 @@ hostfxr_handle Dotnet::GetHostHandle_() noexcept
 	return s_HostfxrHandle;
 }
 
-void* Dotnet::GetHostLibraryHandle_() noexcept
+void *Dotnet::GetHostLibraryHandle_() noexcept
 {
-	return static_cast<void*>(s_HostfxrLibrary);
+	return static_cast<void *>(s_HostfxrLibrary);
 }
 
 void Dotnet::CollectGarbage_(int32_t generation, CollectionMode mode, bool blocking, bool compacting) noexcept
@@ -442,7 +443,7 @@ void Dotnet::UploadInternalCalls_(uint32_t typeID, const std::span<InternalCallU
 		throw std::runtime_error("Failed to upload internal calls for a .NET type.");
 }
 
-void Dotnet::InvokeStaticMethod_(uint32_t methodHash, void* resultPtr, const void** argsPtr)
+void Dotnet::InvokeStaticMethod_(uint32_t methodHash, void *resultPtr, const void **argsPtr)
 {
 	NV_PROFILE_FUNC;
 
