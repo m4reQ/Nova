@@ -5,6 +5,7 @@
 #else
 #error "Unsupported platform!"
 #endif
+#include <utility>
 
 namespace Nova
 {
@@ -17,7 +18,8 @@ namespace Nova
 
         GLContext(const GLContext &) = delete;
 
-        GLContext(GLContext &&) noexcept = default;
+        constexpr GLContext(GLContext &&other) noexcept
+            : data_(std::exchange(other.data_, {})) {}
 
         ~GLContext() noexcept;
 
@@ -29,7 +31,11 @@ namespace Nova
 
         GLContext &operator=(const GLContext &) = delete;
 
-        GLContext &operator=(GLContext &&) noexcept = default;
+        constexpr GLContext &operator=(GLContext &&other) noexcept
+        {
+            data_ = std::exchange(other.data_, {});
+            return *this;
+        }
 
     private:
         GLContextData data_;
