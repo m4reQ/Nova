@@ -23,7 +23,8 @@ namespace Nova
             int y,
             int width,
             int height,
-            HINSTANCE hInstance);
+            HINSTANCE hInstance,
+            void *userData);
 
         WindowHandle(
             DWORD exStyle,
@@ -34,7 +35,8 @@ namespace Nova
             int y,
             int width,
             int height,
-            HINSTANCE hInstance);
+            HINSTANCE hInstance,
+            void *userData);
 
         WindowHandle(
             DWORD exStyle,
@@ -45,7 +47,8 @@ namespace Nova
             int y,
             int width,
             int height,
-            HINSTANCE hInstance);
+            HINSTANCE hInstance,
+            void *userData);
 
         WindowHandle(
             DWORD exStyle,
@@ -56,7 +59,8 @@ namespace Nova
             int y,
             int width,
             int height,
-            HINSTANCE hInstance);
+            HINSTANCE hInstance,
+            void *userData);
 
         WindowHandle &operator=(WindowHandle &&) noexcept = default;
 

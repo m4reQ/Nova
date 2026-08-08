@@ -1,4 +1,5 @@
 #include <Nova/platform/windows/WindowHandle.hpp>
+#include <Nova/platform/windows/Error.hpp>
 #include <stdexcept>
 
 Nova::WindowHandle::WindowHandle(HWND handle) noexcept
@@ -19,7 +20,8 @@ Nova::WindowHandle::WindowHandle(
     int y,
     int width,
     int height,
-    HINSTANCE hInstance)
+    HINSTANCE hInstance,
+    void *userData)
     : WindowHandle(
           CreateWindowExA(
               exStyle,
@@ -33,10 +35,10 @@ Nova::WindowHandle::WindowHandle(
               nullptr,
               nullptr,
               hInstance,
-              nullptr))
+              userData))
 {
     if (handle_ == nullptr)
-        throw std::runtime_error("Failed to create window.");
+        throw Win32::Exception("Failed to create window");
 }
 
 Nova::WindowHandle::WindowHandle(
@@ -48,17 +50,26 @@ Nova::WindowHandle::WindowHandle(
     int y,
     int width,
     int height,
-    HINSTANCE hInstance)
+    HINSTANCE hInstance,
+    void *userData)
     : WindowHandle(
-          exStyle,
-          reinterpret_cast<LPCSTR>(wndClass),
-          windowName.data(),
-          style,
-          x,
-          y,
-          width,
-          height,
-          hInstance) {}
+          CreateWindowExA(
+              exStyle,
+              reinterpret_cast<LPCSTR>(MAKEINTATOM(wndClass)),
+              windowName.data(),
+              style,
+              x,
+              y,
+              width,
+              height,
+              nullptr,
+              nullptr,
+              hInstance,
+              userData))
+{
+    if (handle_ == nullptr)
+        throw Win32::Exception("Failed to create window");
+}
 
 Nova::WindowHandle::WindowHandle(
     DWORD exStyle,
@@ -69,7 +80,8 @@ Nova::WindowHandle::WindowHandle(
     int y,
     int width,
     int height,
-    HINSTANCE hInstance)
+    HINSTANCE hInstance,
+    void *userData)
     : WindowHandle(
           CreateWindowExW(
               exStyle,
@@ -83,10 +95,10 @@ Nova::WindowHandle::WindowHandle(
               nullptr,
               nullptr,
               hInstance,
-              nullptr))
+              userData))
 {
     if (handle_ == nullptr)
-        throw std::runtime_error("Failed to create window.");
+        throw Win32::Exception("Failed to create window");
 }
 
 Nova::WindowHandle::WindowHandle(
@@ -98,14 +110,23 @@ Nova::WindowHandle::WindowHandle(
     int y,
     int width,
     int height,
-    HINSTANCE hInstance)
+    HINSTANCE hInstance,
+    void *userData)
     : WindowHandle(
-          exStyle,
-          reinterpret_cast<LPCWSTR>(wndClass),
-          windowName.data(),
-          style,
-          x,
-          y,
-          width,
-          height,
-          hInstance) {}
+          CreateWindowExW(
+              exStyle,
+              reinterpret_cast<LPCWSTR>(MAKEINTATOM(wndClass)),
+              windowName.data(),
+              style,
+              x,
+              y,
+              width,
+              height,
+              nullptr,
+              nullptr,
+              hInstance,
+              userData))
+{
+    if (handle_ == nullptr)
+        throw Win32::Exception("Failed to create window");
+}
