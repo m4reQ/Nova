@@ -74,6 +74,12 @@ VertexArray::VertexArray(
 	const Buffer &elementBuffer)
 	: VertexArray(std::span<const VertexInput>(layout.begin(), layout.end()), elementBuffer) {}
 
+VertexArray::~VertexArray() noexcept
+{
+	if (id_)
+		glDeleteVertexArrays(1, &id_);
+}
+
 void VertexArray::AddVertexInput(const VertexInput &vertexInput)
 {
 	AddVertexInput(
@@ -129,7 +135,7 @@ void VertexArray::AddVertexInput(
 		for (GLuint row = 0; row < descriptor.Rows; row++)
 		{
 			const auto attribIndex = descriptor.AttributeIndex + row;
-			const auto offset = attribOffset + (row * descriptor.GetRowSize());
+			const auto currentOffset = attribOffset + (row * descriptor.GetRowSize());
 
 			GL::EnableVertexArrayAttrib(id_, attribIndex);
 			GL::VertexArrayAttribBinding(id_, attribIndex, bindingIndex);
@@ -142,7 +148,7 @@ void VertexArray::AddVertexInput(
 					attribIndex,
 					descriptor.Count,
 					(GLenum)descriptor.AttributeType,
-					offset);
+					currentOffset);
 				break;
 			case AttributeType::Fixed:
 			case AttributeType::Float:
@@ -153,7 +159,7 @@ void VertexArray::AddVertexInput(
 					descriptor.Count,
 					(GLenum)descriptor.AttributeType,
 					descriptor.IsNormalized,
-					offset);
+					currentOffset);
 				break;
 			default:
 				glVertexArrayAttribIFormat(
@@ -161,7 +167,7 @@ void VertexArray::AddVertexInput(
 					attribIndex,
 					descriptor.Count,
 					(GLenum)descriptor.AttributeType,
-					offset);
+					currentOffset);
 				break;
 			}
 		}
@@ -218,18 +224,12 @@ void VertexArray::BindElementBuffer(const Buffer &buffer) const noexcept
 	GL::VertexArrayElementBuffer(id_, (GLuint)buffer.GetID());
 }
 
-void VertexArray::Delete() noexcept
-{
-	glDeleteVertexArrays(1, &id_);
-	id_ = 0;
-}
-
 GLuint VertexArray::FindNextFreeBindingIndex()
 {
 	GLint maxBindingsCount = 0;
 	glGetIntegerv(GL_MAX_VERTEX_ATTRIB_BINDINGS, &maxBindingsCount);
 
-	for (GLuint i = 0; i < maxBindingsCount; i++)
+	for (GLuint i = 0; i < static_cast<GLuint>(maxBindingsCount); i++)
 	{
 		const auto bindingUnused = std::find(
 									   usedBufferBindings_.begin(),

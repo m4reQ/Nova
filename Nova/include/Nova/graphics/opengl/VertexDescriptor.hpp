@@ -25,7 +25,7 @@ namespace Nova
 		GLuint AttributeIndex;
 		AttributeType AttributeType;
 		GLint Count;
-		GLint Rows = 1;
+		GLuint Rows = 1;
 		bool IsNormalized = false;
 
 		GLuint GetTypeSize() const noexcept;

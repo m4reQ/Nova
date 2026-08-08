@@ -1,8 +1,7 @@
 #pragma once
-#include <Nova/graphics/opengl/Buffer.hpp>
 #include <Nova/graphics/opengl/ShaderStage.hpp>
 #include <Nova/core/Utility.hpp>
-#include <glm/vec3.hpp>
+#include <glm/glm.hpp>
 #include <span>
 #include <string>
 #include <string_view>
@@ -20,6 +19,13 @@ namespace Nova
 		std::unique_ptr<std::byte[]> Binary;
 		size_t Size;
 		GLenum Format;
+	};
+
+	/// @brief Used for configuring shader output variables. Equivalent of GLSLs `layout(location=Location) out ... Name`.
+	struct OutputLocation
+	{
+		std::string Name;
+		GLuint Location;
 	};
 
 	class ShaderProgram
@@ -48,27 +54,19 @@ namespace Nova
 
 		ShaderProgram(const ShaderProgram &) = delete;
 
-		ShaderProgram(ShaderProgram &&other) noexcept
-			: resources_(std::move(other.resources_)),
-			  savedBinary_(std::move(other.savedBinary_)),
-			  id_(other.id_) {}
+		ShaderProgram(ShaderProgram &&other) noexcept;
 
-		ShaderProgram(const ShaderStage *stages, size_t stagesCount);
+		ShaderProgram(std::span<const ShaderStage> stages);
 
-		template <HasArrayInterface<ShaderStage> T>
-		ShaderProgram(const T &stages)
-			: ShaderProgram(stages.data(), stages.size()) {}
+		ShaderProgram(std::span<const ShaderStage> stages, std::span<const OutputLocation> outputs);
 
-		template <HasConstArrayInterface<ShaderStage> T>
-		ShaderProgram(const T &stages)
-			: ShaderProgram(stages.data(), stages.size()) {}
+		ShaderProgram(std::initializer_list<ShaderStage> stages);
 
-		ShaderProgram(std::initializer_list<ShaderStage> stages)
-			: ShaderProgram(std::span(stages)) {}
+		ShaderProgram(std::initializer_list<ShaderStage> stages, std::initializer_list<OutputLocation> outputs);
+
+		~ShaderProgram() noexcept;
 
 		void Use() const;
-
-		void Delete() noexcept;
 
 		void SetUniform(const std::string_view name, float value) const;
 
@@ -109,6 +107,6 @@ namespace Nova
 			std::equal_to<>>
 			resources_;
 		std::optional<ProgramBinary> savedBinary_ = std::nullopt;
-		GLuint id_;
+		GLuint id_ = 0;
 	};
 }

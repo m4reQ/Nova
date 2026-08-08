@@ -1,96 +1,205 @@
 #pragma once
-#include <Nova/core/Build.hpp>
 #include <Nova/graphics/opengl/Buffer.hpp>
 #include <Nova/graphics/opengl/ShaderProgram.hpp>
+#include <Nova/graphics/opengl/BindlessTextureBinder.hpp>
+#include <Nova/graphics/opengl/VertexArray.hpp>
+#include <Nova/graphics/opengl/Sync.hpp>
+#include <Nova/graphics/opengl/Framebuffer.hpp>
+#include <Nova/graphics/opengl/Context.hpp>
 #include <Nova/graphics/opengl/Texture.hpp>
-#include <Nova/graphics/opengl/GL.hpp>
+#include <Nova/graphics/Window.hpp>
 #include <Nova/graphics/Rect.hpp>
 #include <Nova/graphics/Material.hpp>
-#include <Nova/graphics/RendererSettings.hpp>
-#include <Nova/assets/Model.hpp>
-#include <glm/vec2.hpp>
-#include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
-#include <utility>
+#include <Nova/core/Utility.hpp>
+#include <glm/glm.hpp>
+#include <string>
 #include <filesystem>
-#include <optional>
+#include <memory>
 
 namespace Nova
 {
-	struct RendererInfo
-	{
-		std::string_view VendorName;
-		std::string_view RendererName;
-		std::string_view Version;
-		std::string_view GLSLVersion;
-	};
+    struct ModelVertexData
+    {
+        glm::vec3 Position;
+        glm::vec3 Normal;
+        glm::vec2 TextureCoords;
+    };
 
-	enum class PolygonMode
-	{
-		Fill = GL_FILL,
-		Wireframe = GL_LINE,
-		Points = GL_POINT,
-	};
+    struct PointLightData
+    {
+        glm::vec4 Color;
+        glm::vec3 Position;
+        float Radius;
+    };
 
-	enum class RenderTexture
-	{
-		Color = 0,
-		Position = 1,
-		Normal = 2,
-		Depth = 3,
-		Output = 4,
-	};
+    struct DirLightData
+    {
+        glm::vec4 Color;
+        glm::vec3 Direction;
+        float _Padding[1];
+    };
 
-	namespace Renderer
-	{
-		NV_API void Render(
-			const Model *model,
-			const Material &material,
-			const glm::mat4 &transform);
+    struct InstanceData
+    {
+        GLuint MaterialIndex;
+        glm::mat4 Transform;
+        glm::mat3 NormalTransform;
+    };
 
-		NV_API void SetCamera(
-			const glm::mat4 &view,
-			const glm::mat4 &projection,
-			const glm::vec3 &position,
-			float zNear,
-			float zFar);
+    struct DrawData
+    {
+        std::vector<InstanceData> OpaqueInstanceData;
+        std::vector<InstanceData> TransparentInstanceData;
+        size_t Age;
+    };
 
-		NV_API void SetViewport(const Rect<int> &viewport) noexcept;
+    struct CameraData
+    {
+        glm::mat4 ViewMatrix;
+        glm::mat4 ProjectionMatrix;
+        glm::vec3 Position;
+        float ZNear;
+        float ZFar;
+    };
 
-		NV_API void SetViewport(
-			const Rect<int> &viewport,
-			const Rect<int> &scissor) noexcept;
+    struct MaterialData
+    {
+        glm::vec4 Color;
+        float SpecularIntensity;
+        float Shininess;
+        GLuint AlbedoHandleHigh;
+        GLuint AlbedoHandleLow;
+    };
 
-		NV_API void SetPolygonMode(PolygonMode mode) noexcept;
+    struct RendererInfo
+    {
+        std::string VendorName;
+        std::string RendererName;
+        std::string Version;
+        std::string GLSLVersion;
+    };
 
-		NV_API GLuint GetRenderTextureID(RenderTexture texture) noexcept;
+    struct FrameInfo
+    {
+        Rect<unsigned int> Viewport;
+        Rect<unsigned int> Scissor;
+        unsigned int Width;
+        unsigned int Height;
+        size_t DrawCalls;
+        glm::vec4 ClearColor;
+    };
 
-		NV_API const RendererInfo &GetInfo() noexcept;
+    class Renderer
+    {
+    public:
+        Renderer() = delete;
 
-		NV_API void SetDisplaySize(int width, int height) noexcept;
+        Renderer(const Window &window);
 
-		NV_API void AddPointLight(const glm::vec4 &color, const glm::vec3 &position, float radius);
+        Renderer(const Renderer &) = delete;
 
-		NV_API void AddDirectionalLight(const glm::vec4 &color, const glm::vec3 &direction);
+        Renderer(Renderer &&) noexcept = default;
 
-		NV_API void Clear(ClearMask mask = ClearMask::ColorBufferBit) noexcept;
+        // NOTE Just to destroy texture binder before white texture
+        ~Renderer() noexcept;
 
-		NV_API void SetClearColor(float r, float g, float b, float a) noexcept;
+        constexpr const RendererInfo &GetInfo() const noexcept { return info_; }
 
-		NV_API void SetClearColor(const glm::vec4 &color) noexcept;
+        constexpr const FrameInfo &GetFrameInfo() const noexcept { return frameInfo_; }
 
-		NV_API void Draw(
-			const glm::vec4 &clearColor,
-			const glm::vec4 &fogColor);
+        void Clear(float r, float g, float b, float a) const noexcept;
 
-		NV_API void DisplayFramebuffer() noexcept;
+        constexpr void SetClearColor(const glm::vec4 &color) noexcept { frameInfo_.ClearColor = color; }
 
-		void _Initialize(
-			int frameWidth,
-			int frameHeight,
-			GLADloadfunc getProcAddressFunc,
-			const RendererSettings &settings);
+        constexpr void SetClearColor(float r, float g, float b, float a) noexcept { frameInfo_.ClearColor = glm::vec4(r, g, b, a); }
 
-		void _Shutdown();
-	}
+        void SetCamera(
+            const glm::mat4 &view,
+            const glm::mat4 &projection) noexcept;
+
+        void SetCamera(
+            const glm::mat4 &view,
+            const glm::mat4 &projection,
+            const glm::vec3 &position,
+            float zNear,
+            float zFar) noexcept;
+
+        void SetViewport(const Rect<unsigned int> &viewport) noexcept;
+
+        void SetViewport(
+            const Rect<unsigned int> &viewport,
+            const Rect<unsigned int> &scissor) noexcept;
+
+        void AddPointLight(
+            const glm::vec4 &color,
+            const glm::vec3 &position,
+            float radius) noexcept;
+
+        void AddDirectionalLight(
+            const glm::vec4 &color,
+            const glm::vec3 &direction);
+
+        void Render(
+            std::shared_ptr<Buffer> modelBuffer,
+            const Material &material,
+            const glm::mat4 &transform);
+
+        void Render(
+            std::shared_ptr<Buffer> modelBuffer,
+            const Material &material,
+            const glm::mat4 &transform,
+            const glm::mat3 &transformNormal);
+
+        void Draw(
+            unsigned int frameWidth,
+            unsigned int frameHeight,
+            std::shared_ptr<Texture> skyboxTexture);
+
+        void DisplayFramebuffer(const Window &window) const noexcept;
+
+        Renderer &operator=(const Renderer &) = delete;
+
+        Renderer &operator=(Renderer &&) noexcept = default;
+
+    private:
+        GLContext context_;
+        RendererInfo info_;
+        Framebuffer framebuffer_;
+        BindlessTextureBinder textureBinder_;
+        Texture whiteTexture_;
+        GLuint64 whiteTextureHandle_;
+        ShaderProgram deferredGeometryProgram_;
+        ShaderProgram deferredLightProgram_;
+        ShaderProgram deferredTransparentProgram_;
+        ShaderProgram deferredFogProgram_;
+        ShaderProgram skyboxProgram_;
+        FrameInfo frameInfo_;
+        Buffer cameraBuffer_;
+        Buffer instanceBuffer_;
+        Buffer materialsBuffer_;
+        Buffer lightsBuffer_;
+        BufferRegion<InstanceData> instanceBufferData_;
+        BufferRegion<MaterialData> materialsBufferData_;
+        BufferRegion<PointLightData> pointLightsData_;
+        BufferRegion<DirLightData> dirLightsData_;
+        VertexArray vertexArray_;
+        Sync frameSync_;
+        Sync instanceDataSync_;
+        std::unordered_map<MaterialData, GLuint, XXHasher<MaterialData>> materialsCache_;
+        std::unordered_map<std::shared_ptr<Buffer>, DrawData> drawData_;
+        glm::vec3 cameraPosition_;
+
+        std::vector<InstanceData> &GetInstanceDataForModel(std::shared_ptr<Buffer> modelBuffer, bool useAlpha) noexcept;
+        GLuint GetMaterialIndex(const Material &material);
+        void DrawBatch(const std::shared_ptr<Buffer> &modelBuffer, std::span<const InstanceData> instanceData) noexcept;
+    };
+
+    constexpr bool operator==(const MaterialData &a, const MaterialData &b) noexcept
+    {
+        return a.Color == b.Color &&
+               a.SpecularIntensity == b.SpecularIntensity &&
+               a.Shininess == b.Shininess &&
+               a.AlbedoHandleHigh == b.AlbedoHandleHigh &&
+               a.AlbedoHandleLow == b.AlbedoHandleLow;
+    }
 }

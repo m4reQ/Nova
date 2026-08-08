@@ -20,25 +20,25 @@ namespace Nova
 
 		constexpr AssetType GetType() const noexcept override { return AssetType::Model; }
 
-		constexpr void SetModelBuffer(Buffer &&buffer) noexcept { modelBuffer_ = std::move(buffer); }
+		constexpr void SetModelBuffer(std::shared_ptr<Buffer> &&buffer) noexcept { modelBuffer_ = std::move(buffer); }
 
-		constexpr void SetIndexBuffer(Buffer &&buffer) noexcept { indexBuffer_ = std::move(buffer); }
+		constexpr void SetIndexBuffer(std::shared_ptr<Buffer> &&buffer) noexcept { indexBuffer_ = std::move(buffer); }
 
-		constexpr const Buffer &GetModelDataBuffer() const noexcept { return modelBuffer_; }
+		const std::shared_ptr<Buffer> GetModelDataBuffer() const noexcept { return modelBuffer_; }
 
-		constexpr const std::optional<Nova::Buffer> &GetIndexBuffer() const noexcept { return indexBuffer_; }
+		const std::shared_ptr<Buffer> GetIndexBuffer() const noexcept { return indexBuffer_; }
 
-		constexpr bool UsesIndexBuffer() const noexcept { return indexBuffer_.has_value(); }
+		constexpr bool UsesIndexBuffer() const noexcept { return indexBuffer_ != nullptr; }
 
-		constexpr size_t GetIndexDataSize() const noexcept { return indexBuffer_.has_value() ? indexBuffer_.value().GetSize() : 0; }
+		constexpr size_t GetIndexDataSize() const noexcept { return indexBuffer_ != nullptr ? indexBuffer_->GetSize() : 0zu; }
 
-		constexpr size_t GetModelDataSize() const noexcept { return modelBuffer_.GetSize(); }
+		constexpr size_t GetModelDataSize() const noexcept { return modelBuffer_->GetSize(); }
 
 		constexpr GLenum GetPrimitiveMode() const noexcept { return primitiveMode_; }
 
 	private:
-		std::optional<Nova::Buffer> indexBuffer_;
-		Nova::Buffer modelBuffer_;
+		std::shared_ptr<Nova::Buffer> indexBuffer_;
+		std::shared_ptr<Nova::Buffer> modelBuffer_;
 		GLenum primitiveMode_ = GL_TRIANGLES;
 	};
 }

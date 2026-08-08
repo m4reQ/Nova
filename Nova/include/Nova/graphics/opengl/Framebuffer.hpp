@@ -1,77 +1,11 @@
 #pragma once
-#include <Nova/graphics/opengl/GL.hpp>
-#include <glm/vec4.hpp>
-#include <glm/vec2.hpp>
+#include <Nova/graphics/opengl/FramebufferAttachment.hpp>
 #include <vector>
 #include <span>
 #include <initializer_list>
 
 namespace Nova
 {
-	enum class AttachmentFlags
-	{
-		Default = 0,
-		Resizable = 1,
-		DrawDest = 2,
-		UseRenderbuffer = 8,
-	};
-
-	constexpr AttachmentFlags operator&(AttachmentFlags a, AttachmentFlags b) noexcept
-	{
-		return (AttachmentFlags)((std::underlying_type_t<AttachmentFlags>)a & (std::underlying_type_t<AttachmentFlags>)b);
-	}
-
-	constexpr AttachmentFlags operator|(AttachmentFlags a, AttachmentFlags b) noexcept
-	{
-		return (AttachmentFlags)((std::underlying_type_t<AttachmentFlags>)a | (std::underlying_type_t<AttachmentFlags>)b);
-	}
-
-	constexpr AttachmentFlags operator^(AttachmentFlags a, AttachmentFlags b) noexcept
-	{
-		return (AttachmentFlags)((std::underlying_type_t<AttachmentFlags>)a ^ (std::underlying_type_t<AttachmentFlags>)b);
-	}
-
-	constexpr bool IsFlagSet(AttachmentFlags flags, AttachmentFlags x) noexcept
-	{
-		return (flags & x) == x;
-	}
-
-	struct FramebufferAttachmentSpec
-	{
-		GLsizei Width;
-		GLsizei Height;
-		InternalFormat Format;
-		AttachmentFlags Flags = AttachmentFlags::Default;
-		TextureMinFilter MinFilter = TextureMinFilter::Nearest;
-		TextureMagFilter MagFilter = TextureMagFilter::Nearest;
-
-		constexpr bool IsResizable() const noexcept
-		{
-			return IsFlagSet(Flags, AttachmentFlags::Resizable);
-		}
-
-		constexpr bool IsDrawDest() const noexcept
-		{
-			return IsFlagSet(Flags, AttachmentFlags::DrawDest);
-		}
-
-		constexpr bool UseRenderbuffer() const noexcept
-		{
-			return IsFlagSet(Flags, AttachmentFlags::UseRenderbuffer);
-		}
-
-		constexpr glm::ivec2 GetSize() const noexcept
-		{
-			return {Width, Height};
-		}
-	};
-
-	struct FramebufferAttachment
-	{
-		FramebufferAttachmentSpec Spec;
-		GLuint AttachmentID;
-	};
-
 	class Framebuffer
 	{
 	public:
@@ -80,7 +14,8 @@ namespace Nova
 		Framebuffer(const Framebuffer &) = delete;
 
 		constexpr Framebuffer(Framebuffer &&other) noexcept
-			: id_(std::exchange(other.id_, 0)), attachments_(std::move(other.attachments_)) {}
+			: id_(std::exchange(other.id_, 0)),
+			  attachments_(std::move(other.attachments_)) {}
 
 		Framebuffer(std::span<const FramebufferAttachmentSpec> attachmentSpecs);
 
@@ -88,8 +23,7 @@ namespace Nova
 			: Framebuffer(std::span(attachmentSpecs)) {}
 
 		// TODO Add destructor for framebuffer once correct destruction order is figured out
-		// ~Framebuffer() noexcept;
-		void Delete() noexcept;
+		~Framebuffer() noexcept;
 
 		void Bind() const noexcept;
 
@@ -99,7 +33,7 @@ namespace Nova
 
 		void Resize(const glm::ivec2 &size) noexcept;
 
-		void Blit(Attachment attachment) const noexcept;
+		void Blit(Attachment attachment, unsigned int width, unsigned int height) const noexcept;
 
 		void ClearAttachment(GLint drawBuffer, const glm::vec4 &color);
 
@@ -111,10 +45,17 @@ namespace Nova
 
 		void ClearAttachment(GLfloat depth, GLint stencil);
 
+		void Invalidate(std::span<const GLenum> attachments) const noexcept;
+
+		void Invalidate(std::initializer_list<GLenum> attachments) const noexcept;
+
+		constexpr const std::vector<FramebufferAttachment> &GetAttachments() const noexcept { return attachments_; }
+
 		constexpr const FramebufferAttachment &GetAttachment(size_t index) const { return attachments_[index]; }
 
 		Framebuffer &operator=(const Framebuffer &) = delete;
 
+		// TODO Make default move constructors zero out IDs
 		constexpr Framebuffer &operator=(Framebuffer &&other) noexcept
 		{
 			id_ = std::exchange(other.id_, 0);
@@ -127,6 +68,6 @@ namespace Nova
 
 	private:
 		std::vector<FramebufferAttachment> attachments_;
-		GLuint id_;
+		GLuint id_ = 0;
 	};
 }

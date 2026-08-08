@@ -93,7 +93,7 @@ static void LoadImageFromFileList(ImageLoadingData *loadingData, const std::vect
     // TODO Check if all faces have the same format etc
 }
 
-static void LoadImageFromMemory(ImageLoadingData *loadingData, std::span<const uint8_t> data)
+static void LoadImageFromMemory(ImageLoadingData *, std::span<const uint8_t>)
 {
     // TODO Implement
 }
@@ -165,8 +165,8 @@ void ImageLoader::FreeLoadingData(void *loadingData) noexcept
     delete loadingData_;
 }
 
-void ImageLoader::PreLoad(std::shared_ptr<Asset> asset, void *loadingData) noexcept
+void ImageLoader::PreLoad(std::shared_ptr<Asset>, void *) noexcept
 {
-    auto asset_ = std::static_pointer_cast<Image>(asset);
-    asset_->texture_ = Renderer::GetWhiteTexture_();
+    // auto asset_ = std::static_pointer_cast<Image>(asset);
+    // asset_->texture_ = Renderer::GetWhiteTexture_();
 }

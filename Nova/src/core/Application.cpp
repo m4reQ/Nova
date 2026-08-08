@@ -1,4 +1,6 @@
 #include <Nova/core/Application.hpp>
+#include <Nova/core/System.hpp>
+#include <Nova/debug/Profile.hpp>
 
 using FrameClock = std::chrono::high_resolution_clock;
 
@@ -16,21 +18,18 @@ Nova::Application::Application(const std::string_view name, const StartupData &s
           startupData,
           eventSystem_,
           inputSystem_),
-      renderer_() {}
+      renderer_(window_) {}
 
 void Nova::Application::Run()
 {
-    // NV_LOG_INITIALIZE("./NovaLog.txt");
-    // NV_LOG_INFO("Using working directory \"{}\".", std::filesystem::current_path().string());
-    // NV_PROFILE_SET_ENABLED(true);
-    // NV_PROFILE_BEGIN_SESSION("./NovaProfileSession.json");
-    // NV_PROFILE_SET_CURRENT_THREAD_NAME("MainThread");
-    // NV_PROFILE_SET_CURRENT_THREAD_INDEX(0);
-
     OnLoad();
 
     while (!window_.ShouldClose())
     {
+        NV_PROFILE_SCOPE("::ProcessFrame");
+        NV_PROFILE_COUNTER("Memory (MB)", static_cast<double>(System::GetProcMemoryInfo().VirtualMemoryUsed) / 1000000.0);
+        NV_PROFILE_COUNTER("Frametime (s)", GetFrametime());
+
         const auto frameStart = FrameClock::now();
 
         window_.ProcessEvents();

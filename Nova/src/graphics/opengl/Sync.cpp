@@ -31,7 +31,8 @@ static GLenum WaitClientSyncInfinite(GLsync sync) noexcept
 Sync::~Sync() noexcept
 {
     for (const auto sync : syncHandles_)
-        glDeleteSync(sync);
+        if (sync)
+            glDeleteSync(sync);
 }
 
 void Sync::Set() noexcept

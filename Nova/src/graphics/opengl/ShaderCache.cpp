@@ -1,4 +1,4 @@
-#include <Nova/graphics/ShaderCache.hpp>
+#include <Nova/graphics/opengl/ShaderCache.hpp>
 #include <Nova/debug/Profile.hpp>
 #include <Nova/core/Utility.hpp>
 #include <stdexcept>
@@ -14,30 +14,6 @@ static std::filesystem::path _GetCachedProgramFilepath(const std::filesystem::pa
 static std::filesystem::path GetCacheInfoFilepath(const std::filesystem::path &directory)
 {
     return directory / "CacheInfo.json";
-}
-
-static CachedProgram CachedProgramFromJSON(const nlohmann::json &json)
-{
-    NV_PROFILE_FUNC;
-
-    return CachedProgram{
-        .Name = json["name"],
-        .BinaryType = json["type"],
-        .CreatedAt = std::chrono::system_clock::time_point(
-            std::chrono::milliseconds(
-                (unsigned long)json["created_at"])),
-        .Hash = std::stoull(std::string(json["hash"])),
-    };
-}
-
-static nlohmann::json CachedProgramToJSON(const CachedProgram &cachedProgram)
-{
-    return nlohmann::json{
-        {"name", cachedProgram.Name},
-        {"type", cachedProgram.BinaryType},
-        {"created_at", std::chrono::duration_cast<std::chrono::milliseconds>(cachedProgram.CreatedAt.time_since_epoch()).count()},
-        {"hash", std::to_string(cachedProgram.Hash)},
-    };
 }
 
 static std::unordered_map<std::string, CachedProgram, StringHash, std::equal_to<>> ReadCacheFilepath(const std::filesystem::path &cacheDir)
@@ -57,11 +33,10 @@ static std::unordered_map<std::string, CachedProgram, StringHash, std::equal_to<
         cacheInfoFile >> cacheInfoJson;
 
         cachedPrograms.reserve(cacheInfoJson.size());
-
         for (const auto &cacheEntryData : cacheInfoJson)
         {
-            const auto cacheEntry = CachedProgramFromJSON(cacheEntryData);
-            cachedPrograms.emplace(cacheEntry.Name, cacheEntry);
+            const auto cacheEntry = CachedProgram::FromJSON(cacheEntryData);
+            cachedPrograms.emplace(cacheEntry.Name, std::move(cacheEntry));
         }
     }
 
@@ -80,25 +55,23 @@ static void DumpCacheRegistry(
 
     nlohmann::json json = nlohmann::json::array();
     for (const auto &[_, entry] : cachedPrograms)
-        json.push_back(CachedProgramToJSON(entry));
+        json.push_back(entry.ToJSON());
 
     output << json;
 }
 
 ShaderCache::ShaderCache()
-{
-    ReadCacheFilepath(m_Directory);
-}
+    : ShaderCache(std::filesystem::current_path()) {}
 
 ShaderCache::ShaderCache(const std::filesystem::path &directory)
-    : m_Directory(directory)
+    : directory_(directory)
 {
-    ReadCacheFilepath(m_Directory);
+    ReadCacheFilepath(directory_);
 }
 
 ShaderCache::~ShaderCache() noexcept
 {
-    DumpCacheRegistry(GetCacheInfoFilepath(m_Directory), m_CachedPrograms);
+    DumpCacheRegistry(GetCacheInfoFilepath(directory_), m_CachedPrograms);
 }
 
 void ShaderCache::Clear(bool removeData) noexcept
@@ -109,11 +82,11 @@ void ShaderCache::Clear(bool removeData) noexcept
     {
         for (const auto &[_, cachedProgram] : m_CachedPrograms)
         {
-            const auto dataFilepath = _GetCachedProgramFilepath(m_Directory, cachedProgram);
+            const auto dataFilepath = _GetCachedProgramFilepath(directory_, cachedProgram);
             std::filesystem::remove(dataFilepath);
         }
 
-        std::filesystem::remove(GetCacheInfoFilepath(m_Directory));
+        std::filesystem::remove(GetCacheInfoFilepath(directory_));
     }
 
     m_CachedPrograms.clear();
@@ -130,7 +103,7 @@ std::filesystem::path ShaderCache::GetCachedProgramFilepath(const std::string_vi
     if (cachedProgram == m_CachedPrograms.end())
         throw std::runtime_error("Couldn't find cached shader program with given name.");
 
-    return _GetCachedProgramFilepath(m_Directory, cachedProgram->second);
+    return _GetCachedProgramFilepath(directory_, cachedProgram->second);
 }
 
 ShaderProgram ShaderCache::LoadCachedProgram(const std::string_view name)
@@ -143,7 +116,7 @@ ShaderProgram ShaderCache::LoadCachedProgram(const std::string_view name)
 
     return ShaderProgram::FromBinary(
         cachedProgram->second.BinaryType,
-        m_Directory / std::format("{}.bin", cachedProgram->second.Name));
+        directory_ / std::format("{}.bin", cachedProgram->second.Name));
 }
 
 ShaderProgram ShaderCache::LoadCachedProgram(const std::string_view name, std::function<ShaderProgram(void)> fallback)
@@ -161,7 +134,7 @@ ShaderProgram ShaderCache::LoadCachedProgram(const std::string_view name, std::f
 
     return ShaderProgram::FromBinary(
         cachedProgram->second.BinaryType,
-        m_Directory / std::format("{}.bin", cachedProgram->second.Name));
+        directory_ / std::format("{}.bin", cachedProgram->second.Name));
 }
 
 void ShaderCache::CacheProgram(ShaderProgram &program, const std::string_view name)
@@ -170,7 +143,7 @@ void ShaderCache::CacheProgram(ShaderProgram &program, const std::string_view na
 
     const auto [binary, binaryType] = program.GetBinary();
 
-    std::ofstream binaryFile(m_Directory / std::format("{}.bin", name), std::ios::binary);
+    std::ofstream binaryFile(directory_ / std::format("{}.bin", name), std::ios::binary);
     if (!binaryFile.is_open())
         throw std::runtime_error("Failed to open shader binary file for writing.");
 
@@ -182,9 +155,9 @@ void ShaderCache::CacheProgram(ShaderProgram &program, const std::string_view na
     const auto nameStr = std::string(name);
     CachedProgram cachedProgram{
         .Name = nameStr,
-        .BinaryType = binaryType,
         .CreatedAt = std::chrono::system_clock::now(),
         .Hash = XXH64(binary.data(), binary.size_bytes(), 2137),
+        .BinaryType = binaryType,
     };
 
     m_CachedPrograms.insert_or_assign(nameStr, cachedProgram);
@@ -194,7 +167,7 @@ void ShaderCache::SetDirectory(const std::filesystem::path &directory)
 {
     NV_PROFILE_FUNC;
 
-    if (directory == m_Directory)
+    if (directory == directory_)
         return;
 
     if (!std::filesystem::exists(directory))
@@ -208,6 +181,6 @@ void ShaderCache::SetDirectory(const std::filesystem::path &directory)
     if (!std::filesystem::is_directory(directory))
         throw std::runtime_error("Shader cache path is not a directory.");
 
-    m_Directory = directory;
+    directory_ = directory;
     m_CachedPrograms = ReadCacheFilepath(directory);
 }

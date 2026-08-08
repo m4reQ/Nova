@@ -1,6 +1,7 @@
 #include <Nova/graphics/opengl/BindlessTextureBinder.hpp>
 #include <Nova/debug/Profile.hpp>
 #include <Nova/debug/Log.hpp>
+#include <glad/gl.h>
 #include <stdexcept>
 
 using namespace Nova;
@@ -86,10 +87,10 @@ GLuint64 BindlessTextureBinder::Bind(const ITexture &texture, bool isPersistent)
 
             // try to evict oldest texture
             std::list<BindlessTextureBinding>::iterator oldestBinding = bindings_.begin();
-            for (auto binding = bindings_.begin(); binding != bindings_.end(); binding++)
+            for (auto curBinding = bindings_.begin(); curBinding != bindings_.end(); curBinding++)
             {
-                if (!binding->IsPersistent && binding->Age >= oldestBinding->Age)
-                    oldestBinding = binding;
+                if (!curBinding->IsPersistent && curBinding->Age >= oldestBinding->Age)
+                    oldestBinding = curBinding;
             }
 
             if (oldestBinding->IsPersistent)

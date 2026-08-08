@@ -5,6 +5,7 @@
 #include <Nova/core/File.hpp>
 #include <Nova/core/Utility.hpp>
 #include <Nova/debug/Profile.hpp>
+#include <algorithm>
 
 using namespace Nova;
 
@@ -15,26 +16,6 @@ static void CheckMagicNumber(File &file)
 
     if (magicNumber != DDSMagicNumber)
         throw std::runtime_error("Invalid magic number for a DDS file.");
-}
-
-static InternalFormat DetermineInternalFormat(const DDSPixelFormat &pixelFormat)
-{
-    // TODO Check pixel format flags ?
-    if (!pixelFormat.HasFourCC())
-    {
-        if (pixelFormat.RGBBitCount == 32)
-            return InternalFormat::RGBA8;
-        else if (pixelFormat.RGBBitCount == 24)
-            return InternalFormat::RGB8;
-        else if (pixelFormat.RGBBitCount == 16)
-            return InternalFormat::RGBA4;
-        else if (pixelFormat.RGBBitCount == 8)
-            return InternalFormat::R8;
-    }
-
-    // TODO Handle DX10 with their formats
-
-    throw std::runtime_error("Cannot determine internal format for uncompressed pixel format.");
 }
 
 static std::pair<InternalFormat, uint32_t> DetermineInternalFormatAndBlockSize(const DDSPixelFormat &pixelFormat)
@@ -74,11 +55,11 @@ static void LoadFromCompressedFile(File &file, const DDSHeader &header, DDSImage
     loadingData.Data = file.ReadToEndBinary();
 
     size_t dataOffset = 0;
-    for (GLsizei mipmap = 0; mipmap < header.GetMipmapCount(); mipmap++)
+    for (GLint mipmap = 0; mipmap < static_cast<GLint>(header.GetMipmapCount()); mipmap++)
     {
-        const auto wBlocks = std::max(1u, (header.Width + 3) / 4);
-        const auto hBlocks = std::max(1u, (header.Height + 3) / 4);
-        const auto depth = std::max(1u, header.Depth >> mipmap);
+        const auto wBlocks = (std::max)(1u, (header.Width + 3) / 4);
+        const auto hBlocks = (std::max)(1u, (header.Height + 3) / 4);
+        const auto depth = (std::max)(1u, header.Depth >> mipmap);
         const auto byteSize = wBlocks * hBlocks * depth * blockSize;
 
         loadingData.UploadInfos.emplace_back(
@@ -96,9 +77,9 @@ static void LoadFromCompressedFile(File &file, const DDSHeader &header, DDSImage
     }
 }
 
-static void LoadFromUncompressedFile(File &file, const DDSHeader &header, DDSImageLoadingData &loadingData)
+static void LoadFromUncompressedFile(File &, const DDSHeader &, DDSImageLoadingData &)
 {
-    const auto internalFormat = DetermineInternalFormat(header.PixelFormat);
+    // const auto internalFormat = DetermineInternalFormat(header.PixelFormat);
 }
 
 static void LoadFromFilepath(const std::filesystem::path &filepath, DDSImageLoadingData &loadingData)
@@ -135,12 +116,12 @@ void DDSImageLoader::FreeLoadingData(void *loadingData) noexcept
     delete static_cast<DDSImageLoadingData *>(loadingData);
 }
 
-void DDSImageLoader::PreLoad(std::shared_ptr<Asset> asset, void *loadingData) noexcept
+void DDSImageLoader::PreLoad(std::shared_ptr<Asset> asset, void *) noexcept
 {
     NV_PROFILE_FUNC;
 
     auto image = std::static_pointer_cast<Image>(asset);
-    image->texture_ = Renderer::GetWhiteTexture_();
+    // image->texture_ = Renderer::GetWhiteTexture_();
 }
 
 void DDSImageLoader::Load(std::shared_ptr<Asset> asset, void *loadingData) noexcept
@@ -168,7 +149,7 @@ void DDSImageLoader::Load(std::shared_ptr<Asset> asset, void *loadingData) noexc
         asset->GetSource());
 }
 
-void DDSImageLoader::PostLoad(std::shared_ptr<Asset> asset, void *loadingData) noexcept
+void DDSImageLoader::PostLoad(std::shared_ptr<Asset>, void *) noexcept
 {
     NV_PROFILE_FUNC;
 }

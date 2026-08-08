@@ -1,5 +1,6 @@
 #pragma once
 #include <Nova/graphics/opengl/ShaderProgram.hpp>
+#include <Nova/graphics/opengl/CachedProgram.hpp>
 #include <filesystem>
 #include <string_view>
 #include <string>
@@ -14,14 +15,6 @@
 
 namespace Nova
 {
-    struct CachedProgram
-    {
-        std::string Name;
-        GLenum BinaryType;
-        std::chrono::system_clock::time_point CreatedAt;
-        XXH64_hash_t Hash;
-    };
-
     class ShaderCache
     {
     public:
@@ -45,11 +38,11 @@ namespace Nova
 
         std::filesystem::path GetCachedProgramFilepath(const std::string_view name);
 
-        constexpr const std::filesystem::path &GetDirectory() const noexcept { return m_Directory; }
+        constexpr const std::filesystem::path &GetDirectory() const noexcept { return directory_; }
 
     private:
         std::unordered_map<std::string, CachedProgram, StringHash, std::equal_to<>> m_CachedPrograms;
-        std::filesystem::path m_Directory = ".";
-        bool m_IsEnabled = true;
+        std::filesystem::path directory_;
+        bool isEnabled_ = true;
     };
 }

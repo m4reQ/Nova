@@ -48,7 +48,8 @@ Texture::Texture(TextureTarget target, const TextureSpec &spec)
 
 Texture::~Texture() noexcept
 {
-    glDeleteTextures(1, &id_);
+    if (id_)
+        GL::DeleteTexture(id_);
 }
 
 void Texture::Bind(GLuint unit) const noexcept

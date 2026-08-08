@@ -30,24 +30,17 @@ static void SpecializeShaderStage(
 {
 	NV_PROFILE_FUNC;
 
-	std::vector<GLuint> constantIndices;
-	constantIndices.reserve(info.SpecializeConstants.size());
+	if (info.ConstantIndices.size() != info.ConstantValues.size())
+		throw std::runtime_error("Specialize constant indices count has to equal specialize constant values count.");
 
-	std::vector<GLuint> constantValues;
-	constantValues.reserve(info.SpecializeConstants.size());
-
-	for (const auto &[index, value] : info.SpecializeConstants)
-	{
-		constantIndices.emplace_back(index);
-		constantValues.emplace_back(value);
-	}
+	assert_fits_in<GLuint>(info.ConstantIndices.size());
 
 	glSpecializeShaderARB(
 		stageID,
 		info.EntryPoint.data(),
-		(GLuint)info.SpecializeConstants.size(),
-		constantIndices.data(),
-		constantValues.data());
+		static_cast<GLuint>(info.ConstantIndices.size()),
+		info.ConstantIndices.data(),
+		info.ConstantValues.data());
 }
 
 ShaderStage ShaderStage::FromGLSL(
@@ -86,31 +79,17 @@ ShaderStage ShaderStage::FromBinary(
 	GLenum binaryType,
 	std::span<const std::byte> binary)
 {
-	return FromBinary(
-		type,
-		binaryType,
-		binary.data(),
-		binary.size_bytes());
-}
-
-ShaderStage ShaderStage::FromBinary(
-	ShaderType type,
-	GLenum binaryType,
-	const std::byte *binary,
-	size_t binarySize)
-{
 	NV_PROFILE_FUNC;
 
-	if (!check_fits_in<GLsizei>(binarySize))
-		throw std::overflow_error("Binary size exceeds max size accepted by OpenGL.");
+	assert_fits_in<GLsizei>(binary.size_bytes());
 
-	const auto id = glCreateShader((GLenum)type);
+	const auto id = glCreateShader(static_cast<GLenum>(type));
 	glShaderBinary(
 		1,
 		&id,
 		binaryType,
-		binary,
-		(GLsizei)binarySize);
+		binary.data(),
+		static_cast<GLsizei>(binary.size_bytes()));
 
 	CheckShaderStatus(id);
 
@@ -124,18 +103,17 @@ ShaderStage ShaderStage::FromBinary(
 {
 	NV_PROFILE_FUNC;
 
-	const auto binary = File::ReadWholeBinary(filepath);
 	return FromBinary(
 		type,
 		binaryType,
-		binary);
+		File::ReadWholeBinary(filepath));
 }
 
 ShaderStage ShaderStage::FromSPIRV(
 	ShaderType type,
 	std::span<const std::byte> binary)
 {
-	return FromSPIRV(type, binary.data(), binary.size_bytes());
+	return FromBinary(type, GL_SHADER_BINARY_FORMAT_SPIR_V, binary);
 }
 
 ShaderStage ShaderStage::FromSPIRV(
@@ -146,31 +124,7 @@ ShaderStage ShaderStage::FromSPIRV(
 	NV_PROFILE_FUNC;
 
 	const auto stage = FromSPIRV(type, binary);
-	SpecializeShaderStage(stage.m_ID, specializeInfo);
-
-	return stage;
-}
-
-ShaderStage ShaderStage::FromSPIRV(
-	ShaderType type,
-	const std::byte *binary,
-	size_t binarySize)
-{
-	NV_PROFILE_FUNC;
-
-	return FromBinary(type, GL_SPIR_V_BINARY, binary, binarySize);
-}
-
-ShaderStage ShaderStage::FromSPIRV(
-	ShaderType type,
-	const std::byte *binary,
-	size_t binarySize,
-	const ShaderSpecializeInfo &specializeInfo)
-{
-	NV_PROFILE_FUNC;
-
-	const auto stage = FromSPIRV(type, binary, binarySize);
-	SpecializeShaderStage(stage.m_ID, specializeInfo);
+	SpecializeShaderStage(stage.id_, specializeInfo);
 
 	return stage;
 }
@@ -181,8 +135,7 @@ ShaderStage ShaderStage::FromSPIRV(
 {
 	NV_PROFILE_FUNC;
 
-	const auto binary = File::ReadWholeBinary(filepath);
-	return FromSPIRV(type, binary);
+	return FromSPIRV(type, File::ReadWholeBinary(filepath));
 }
 
 ShaderStage ShaderStage::FromSPIRV(
@@ -193,7 +146,13 @@ ShaderStage ShaderStage::FromSPIRV(
 	NV_PROFILE_FUNC;
 
 	const auto stage = FromSPIRV(type, filepath);
-	SpecializeShaderStage(stage.m_ID, specializeInfo);
+	SpecializeShaderStage(stage.id_, specializeInfo);
 
 	return stage;
+}
+
+Nova::ShaderStage::~ShaderStage() noexcept
+{
+	if (id_)
+		glDeleteShader(id_);
 }

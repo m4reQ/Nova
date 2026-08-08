@@ -1,783 +1,918 @@
+#pragma once
 #include <Nova/graphics/Renderer.hpp>
-#include <Nova/graphics/opengl/GLObject.hpp>
-#include <Nova/graphics/opengl/Buffer.hpp>
-#include <Nova/graphics/opengl/PersistentMappedBuffer.hpp>
-#include <Nova/graphics/opengl/ShaderProgram.hpp>
-#include <Nova/graphics/opengl/VertexArray.hpp>
-#include <Nova/graphics/opengl/Texture.hpp>
-#include <Nova/graphics/opengl/Framebuffer.hpp>
-#include <Nova/graphics/opengl/Sync.hpp>
-#include <Nova/graphics/opengl/AlignedType.hpp>
-#include <Nova/debug/Profile.hpp>
+#include <Nova/graphics/opengl/GL.hpp>
 #include <Nova/debug/Log.hpp>
-#include <Nova/core/Utility.hpp>
-#include <xxhash.h>
-#include <glad/gl.h>
-#include <unordered_map>
-#include <stdexcept>
-#include <iostream>
-#include <format>
+#include <Nova/debug/Profile.hpp>
 
-#ifdef _DEBUG
-#define BREAK_ON_HIGH_SEVERITY(severity) assert((severity != GL_DEBUG_SEVERITY_HIGH) && "OpenGL error")
-#else
-#define BREAK_ON_HIGH_SEVERITY(severity)
-#endif
-
-using namespace Nova;
-
-constexpr auto MaterialHashSeed = 41925337ui64;
-
-struct PointLightData
-{
-	glm::vec4 Color;
-	glm::vec3 Position;
-	float Radius;
-};
-
-struct DirLightData
-{
-	glm::vec4 Color;
-	glm::vec3 Direction;
-	float _Padding[1];
-};
-
-struct InstanceData
-{
-	GLuint MaterialIndex;
-	GLuint BindlessHangleHigh;
-	GLuint BindlessHandleLow;
-	glm::mat4 Transform;
-	glm::mat3 NormalTransform;
-};
-
-struct CameraData
-{
-	glm::mat4 ViewMatrix;
-	glm::mat4 ProjectionMatrix;
-	glm::vec3 Position;
-	float ZNear;
-	float ZFar;
-};
-
-struct MaterialData
-{
-	glm::vec4 Color;
-	float SpecularIntensity;
-	float Shininess;
-	GLuint TextureIndex;
-};
-
-struct DrawData
-{
-	std::vector<InstanceData> OpaqueInstanceData;
-	std::vector<InstanceData> TransparentInstanceData;
-	size_t Age;
-};
-
-typedef size_t ModelID;
-typedef size_t MaterialID;
-
-constexpr GLuint c_ModelDataBufferBinding = 0;
-constexpr GLsizei c_ShadowMapWidth = 1024;
-constexpr GLsizei c_ShadowMapHeight = 1024;
-constexpr GLsizei c_MaxShadowCasters = 8;
-
-static std::unordered_map<const Model *, DrawData> s_DrawData;
-
-static RendererInfo s_RendererInfo;
-
-// materials
-static PersistentMappedBuffer s_MaterialsBuffer;
-static std::unordered_map<Material, GLuint, XXHasher<Material>> s_Materials;
-
-// lights
-static PersistentMappedBuffer s_LightsBuffer;
-
-static PointLightData *s_PointLights;
-static GLuint s_PointLightsCount;
-static GLuint s_MaxPointLightsCount;
-
-static DirLightData *s_DirLights;
-static GLuint s_DirLightsCount;
-static GLuint s_MaxDirLightsCount;
-
-static PersistentMappedBuffer s_CameraDataBuffer;
-
-static PersistentMappedBuffer s_InstanceBuffer;
-static ShaderProgram s_DeferredGeometryProgram;
-static ShaderProgram s_DeferredLightProgram;
-static ShaderProgram s_DeferredTransparentProgram;
-static ShaderProgram s_DeferredFogProgram;
-static VertexArray s_VertexArray;
-static Texture s_WhiteTexture;
-static Framebuffer s_Framebuffer;
-static Sync s_FrameSync;		// guards materials buffer, lights buffer and camera data buffer
-static Sync s_InstanceDataSync; // guards instance data buffer between each batch draw
-static GLsizei s_CurrentDisplayWidth;
-static GLsizei s_CurrentDisplayHeight;
-
-static glm::vec3 s_CameraPosition;
-
-static void ExecuteShadowMapPass() noexcept
-{
-	NV_PROFILE_FUNC;
-
-	glViewport(0, 0, c_ShadowMapWidth, c_ShadowMapHeight);
-}
-
-static GLuint GetMaterialIndex(const Material &material)
-{
-	NV_PROFILE_FUNC;
-
-	const auto it = s_Materials.find(material);
-	if (it != s_Materials.end())
-	{
-		return it->second;
-	}
-	else
-	{
-		const auto dataPtr = s_MaterialsBuffer.GetDataPtr<Material>();
-		const auto basePtr = s_MaterialsBuffer.GetBasePtr<Material>();
-		const auto materialIndex = dataPtr - basePtr;
-
-		s_MaterialsBuffer.Write(&material, sizeof(Material));
-		s_Materials.emplace(material, (GLuint)materialIndex);
-
-		return materialIndex;
-	}
-}
-
-static ShaderProgram CreateBasicShaderProgram()
-{
-	NV_PROFILE_FUNC;
-
-	return ShaderProgram({
-		ShaderStage::FromGLSL(
-			ShaderType::Vertex,
-			std::filesystem::path("./assets/shaders/basic.vert")),
-		ShaderStage::FromGLSL(
-			ShaderType::Fragment,
-			std::filesystem::path("./assets/shaders/basic.frag")),
-	});
-}
-
-static ShaderProgram CreateDeferredGeometryShaderProgram()
-{
-	NV_PROFILE_FUNC;
-
-	return ShaderProgram({
-		ShaderStage::FromGLSL(
-			ShaderType::Vertex,
-			std::filesystem::path("./assets/shaders/deferredGeometry.vert")),
-		ShaderStage::FromGLSL(
-			ShaderType::Fragment,
-			std::filesystem::path("./assets/shaders/deferredGeometry.frag")),
-	});
-}
-
-static ShaderProgram CreateDeferredLightingShaderProgram()
-{
-	NV_PROFILE_FUNC;
-
-	return ShaderProgram({
-		ShaderStage::FromGLSL(
-			ShaderType::Vertex,
-			std::filesystem::path("./assets/shaders/deferredLighting.vert")),
-		ShaderStage::FromGLSL(
-			ShaderType::Fragment,
-			std::filesystem::path("./assets/shaders/deferredLighting.frag")),
-	});
-}
-
-static ShaderProgram CreateDeferredTransparentShaderProgram()
-{
-	return ShaderProgram({
-		ShaderStage::FromGLSL(
-			ShaderType::Vertex,
-			std::filesystem::path("./assets/shaders/deferredTransparent.vert")),
-		ShaderStage::FromGLSL(
-			ShaderType::Fragment,
-			std::filesystem::path("./assets/shaders/deferredTransparent.frag")),
-	});
-}
-
-static ShaderProgram CreateDeferredFogProgram()
-{
-	return ShaderProgram({
-		ShaderStage::FromGLSL(
-			ShaderType::Vertex,
-			std::filesystem::path("./assets/shaders/deferredFog.vert")),
-		ShaderStage::FromGLSL(
-			ShaderType::Fragment,
-			std::filesystem::path("./assets/shaders/deferredFog.frag")),
-	});
-}
-
-static void RetrieveRendererInfo() noexcept
-{
-	s_RendererInfo.VendorName = reinterpret_cast<const char *>(glGetString(GL_VENDOR));
-	s_RendererInfo.RendererName = reinterpret_cast<const char *>(glGetString(GL_RENDERER));
-	s_RendererInfo.Version = reinterpret_cast<const char *>(glGetString(GL_VERSION));
-	s_RendererInfo.GLSLVersion = reinterpret_cast<const char *>(glGetString(GL_SHADING_LANGUAGE_VERSION));
-}
+constexpr auto maxInstanceCount = 1024zu;
+constexpr auto maxMaterialsCount = 32zu;
+constexpr auto maxPointLights = 32zu;
+constexpr auto maxDirLights = 2zu;
+constexpr auto maxTextureHandleAge = 5ul; // in frames
+constexpr auto albedoAttachmentIndex = 0ul;
+constexpr auto positionAttachmentIndex = 1ul;
+constexpr auto normalAttachmentIndex = 2ul;
+constexpr auto colorAttachmentIndex = 3ul;
+constexpr auto finalAttachmentIndex = 4ul;
+constexpr auto shininessAttachmentIndex = 5ul;
+constexpr auto depthAttachmentIndex = 6ul;
+constexpr auto modelBufferBinding = 0ul;
 
 static glm::mat3 BuildNormalTransformMatrix(const glm::mat4 &transform) noexcept
 {
-	NV_PROFILE_FUNC;
-	return glm::transpose(glm::inverse(glm::mat3(transform)));
+    // Why isn't that constexpr ???
+    return glm::transpose(glm::inverse(glm::mat3(transform)));
 }
 
-static std::vector<InstanceData> &GetModelInstanceDataStore(const Model *model, bool useTransparency)
+static constexpr glm::vec3 ExtractCameraPosition(const glm::mat4 &view) noexcept
 {
-	NV_PROFILE_FUNC;
-
-	const auto &it = s_DrawData.find(model);
-	if (it != s_DrawData.end())
-		return useTransparency
-				   ? it->second.TransparentInstanceData
-				   : it->second.OpaqueInstanceData;
-
-	const auto &[data, _] = s_DrawData.emplace(model, DrawData{.Age = 0});
-	return useTransparency
-			   ? data->second.TransparentInstanceData
-			   : data->second.OpaqueInstanceData;
+    return glm::vec3(glm::inverse(view) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
-void Renderer::Render(
-	const Model *model,
-	const Material &material,
-	const glm::mat4 &transform)
+static constexpr std::pair<float, float> ExtractZPlanes(const glm::mat4 &projection) noexcept
 {
-	NV_PROFILE_FUNC;
+    const auto a = projection[2][2];
+    const auto b = projection[3][2];
 
-	const auto bindlessHandle = s_WhiteTexture.GetBindlessHandle();
-
-	auto &instanceDataStore = GetModelInstanceDataStore(model, !glm::epsilonEqual(material.Color.a, 1.0f, glm::epsilon<float>()));
-	instanceDataStore.emplace_back(
-		InstanceData{
-			.MaterialIndex = GetMaterialIndex(material),
-			.BindlessHangleHigh = (uint32_t)(bindlessHandle & 0xffffffffui32),
-			.BindlessHandleLow = (uint32_t)(bindlessHandle >> 32ui32),
-			.Transform = transform,
-			.NormalTransform = BuildNormalTransformMatrix(transform),
-		});
+    return {b / (a - 1.0f), b / (a + 1.0f)};
 }
 
-void Renderer::SetCamera(
-	const glm::mat4 &view,
-	const glm::mat4 &projection,
-	const glm::vec3 &position,
-	float zNear,
-	float zFar)
+static constexpr const std::string_view DebugTypeToString(GLenum type) noexcept
 {
-	NV_PROFILE_FUNC;
-
-	auto cameraData = s_CameraDataBuffer.GetDataPtr<CameraData>();
-	cameraData->ViewMatrix = view;
-	cameraData->ProjectionMatrix = projection;
-	cameraData->Position = position;
-	cameraData->ZNear = zNear;
-	cameraData->ZFar = zFar;
-
-	s_CameraPosition = position;
+    switch (type)
+    {
+    case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+        return "DEPRECATED BEHAVIOR";
+    case GL_DEBUG_TYPE_ERROR:
+        return "ERROR";
+    case GL_DEBUG_TYPE_MARKER:
+        return "MARKER";
+    case GL_DEBUG_TYPE_OTHER:
+        return "OTHER";
+    case GL_DEBUG_TYPE_PERFORMANCE:
+        return "PERFORMANCE";
+    case GL_DEBUG_TYPE_POP_GROUP:
+        return "POP GROUP";
+    case GL_DEBUG_TYPE_PORTABILITY:
+        return "PORTABILITY";
+    case GL_DEBUG_TYPE_PUSH_GROUP:
+        return "PUSH GROUP";
+    case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
+        return "UNDEFINED BEHAVIOR";
+    default:
+        std::unreachable();
+    }
 }
 
-const RendererInfo &Renderer::GetInfo() noexcept
+static constexpr const std::string_view DebugSourceToString(GLenum source) noexcept
 {
-	return s_RendererInfo;
+    switch (source)
+    {
+    case GL_DEBUG_SOURCE_API:
+        return "API";
+    case GL_DEBUG_SOURCE_APPLICATION:
+        return "APPLICATION";
+    case GL_DEBUG_SOURCE_OTHER:
+        return "OTHER";
+    case GL_DEBUG_SOURCE_SHADER_COMPILER:
+        return "SHADER COMPILER";
+    case GL_DEBUG_SOURCE_THIRD_PARTY:
+        return "THIRD PARTY";
+    case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
+        return "WINDOW SYSTEM";
+    default:
+        std::unreachable();
+    }
 }
 
-void Renderer::SetViewport(const Rect<int> &viewport) noexcept
+static void DebugMessageCallback(
+    [[maybe_unused]] GLenum source,
+    [[maybe_unused]] GLenum type,
+    GLuint,
+    [[maybe_unused]] GLenum severity,
+    GLsizei,
+    [[maybe_unused]] const GLchar *message,
+    const void *)
 {
-	NV_PROFILE_FUNC;
-
-	glViewport(viewport.X, viewport.Y, viewport.Width, viewport.Height);
-}
-
-void Renderer::SetViewport(
-	const Rect<int> &viewport,
-	const Rect<int> &scissor) noexcept
-{
-	NV_PROFILE_FUNC;
-
-	glViewport(viewport.X, viewport.Y, viewport.Width, viewport.Height);
-	glScissor(scissor.X, scissor.Y, scissor.Width, scissor.Height);
-}
-
-void Renderer::AddPointLight(const glm::vec4 &color, const glm::vec3 &position, float radius)
-{
-	NV_PROFILE_FUNC;
-
-	if (s_PointLightsCount >= s_MaxPointLightsCount)
-		return;
-
-	auto &data = s_PointLights[s_PointLightsCount++];
-	data.Color = color;
-	data.Position = position;
-	data.Radius = radius;
-}
-
-void Renderer::AddDirectionalLight(const glm::vec4 &color, const glm::vec3 &direction)
-{
-	NV_PROFILE_FUNC;
-
-	if (s_DirLightsCount >= s_MaxDirLightsCount)
-		return;
-
-	auto &data = s_DirLights[s_DirLightsCount++];
-	data.Color = color;
-	data.Direction = direction;
-}
-
-void Renderer::SetClearColor(float r, float g, float b, float a) noexcept
-{
-	GL::ClearColor(r, g, b, a);
-}
-
-void Renderer::SetClearColor(const glm::vec4 &color) noexcept
-{
-	GL::ClearColor(color);
-}
-
-void Renderer::Clear(ClearMask mask) noexcept
-{
-	NV_PROFILE_FUNC;
-
-	GL::Clear(mask);
-}
-
-void Renderer::SetPolygonMode(PolygonMode mode) noexcept
-{
-	glPolygonMode(GL_FRONT_AND_BACK, (GLenum)mode);
-}
-
-static void DrawBatch(const Model *model, const std::span<InstanceData> instanceData) noexcept
-{
-	NV_PROFILE_FUNC;
-
-	s_VertexArray.BindVertexBuffer(
-		model->GetModelDataBuffer(),
-		c_ModelDataBufferBinding,
-		sizeof(ModelVertex));
-
-	if (model->UsesIndexBuffer())
-		s_VertexArray.BindElementBuffer(model->GetIndexBuffer().value());
-
-	s_InstanceDataSync.WaitClient(SyncTimeoutInfinite);
-
-	s_InstanceBuffer.Write(instanceData);
-	s_InstanceBuffer.Commit();
-
-	if (model->UsesIndexBuffer())
-		glDrawElementsInstanced(
-			model->GetPrimitiveMode(),
-			model->GetIndexDataSize() / sizeof(GLuint),
-			GL_UNSIGNED_INT,
-			nullptr,
-			instanceData.size());
-	else
-		glDrawArraysInstanced(
-			model->GetPrimitiveMode(),
-			0,
-			model->GetModelDataSize() / sizeof(ModelVertex),
-			instanceData.size());
-
-	s_InstanceDataSync.Set();
-}
-
-static void SortTransparentObjects(std::span<InstanceData> instanceData) noexcept
-{
-	NV_PROFILE_FUNC;
-
-	std::sort(
-		instanceData.begin(),
-		instanceData.end(),
-		[](const InstanceData &a, const InstanceData &b)
-		{
-			const auto aDistance = glm::distance(glm::vec3(a.Transform[3]), s_CameraPosition);
-			const auto bDistance = glm::distance(glm::vec3(b.Transform[3]), s_CameraPosition);
-			return aDistance > bDistance;
-		});
-}
-
-static void ExecuteGeometryPass() noexcept
-{
-	NV_PROFILE_FUNC;
-
-	s_MaterialsBuffer.Bind(
-		BufferBaseTarget::ShaderStorageBuffer,
-		s_DeferredGeometryProgram.GetResourceLocation("sMaterialData"));
-
-	s_CameraDataBuffer.Bind(
-		BufferBaseTarget::UniformBuffer,
-		s_DeferredGeometryProgram.GetResourceLocation("uCameraData"));
-
-	s_VertexArray.Use();
-
-	s_DeferredGeometryProgram.Use();
-
-	GL::Disable(EnableCap::Blend);
-	GL::Enable(EnableCap::DepthTest);
-	GL::DepthFunc(DepthFunction::Less);
-
-	for (auto &[model, drawData] : s_DrawData)
-	{
-		DrawBatch(model, drawData.OpaqueInstanceData);
-		drawData.OpaqueInstanceData.clear();
-	}
-}
-
-static void ExecuteLightingPass() noexcept
-{
-	NV_PROFILE_FUNC;
-
-	s_DeferredLightProgram.SetUniform("uAmbient", 0.3f);
-	s_DeferredLightProgram.SetUniform("uShininess", 86.0f);
-	s_DeferredLightProgram.SetUniform("uPointLightsCount", s_PointLightsCount);
-	s_DeferredLightProgram.SetUniform("uDirLightsCount", s_DirLightsCount);
-	s_DeferredLightProgram.Use();
-
-	s_LightsBuffer.Bind(
-		BufferBaseTarget::ShaderStorageBuffer,
-		s_DeferredLightProgram.GetResourceLocation("sPointLightsBuffer"),
-		0,
-		sizeof(PointLightData) * s_MaxPointLightsCount);
-	s_LightsBuffer.Bind(
-		BufferBaseTarget::ShaderStorageBuffer,
-		s_DeferredLightProgram.GetResourceLocation("sDirLightsBuffer"),
-		sizeof(PointLightData) * s_MaxPointLightsCount,
-		sizeof(DirLightData) * s_MaxDirLightsCount);
-
-	s_CameraDataBuffer.Bind(
-		BufferBaseTarget::UniformBuffer,
-		s_DeferredLightProgram.GetResourceLocation("uCameraData"));
-
-	const std::array<GLuint, 3> gBufferTextureIDs{
-		s_Framebuffer.GetAttachment(0).AttachmentID,
-		s_Framebuffer.GetAttachment(1).AttachmentID,
-		s_Framebuffer.GetAttachment(2).AttachmentID,
-	};
-
-	glBindTextures(0, gBufferTextureIDs.size(), gBufferTextureIDs.data());
-
-	GL::Disable(EnableCap::DepthTest);
-	GL::DepthMask(false);
-
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-}
-
-static void ExecuteTransparentPass() noexcept
-{
-	NV_PROFILE_FUNC;
-
-	s_DeferredTransparentProgram.SetUniform("uAmbient", 0.3f);
-	s_DeferredTransparentProgram.SetUniform("uShininess", 86.0f);
-	s_DeferredTransparentProgram.SetUniform("uPointLightsCount", s_PointLightsCount);
-	s_DeferredTransparentProgram.SetUniform("uDirLightsCount", s_DirLightsCount);
-	s_DeferredTransparentProgram.Use();
-
-	s_VertexArray.Use();
-
-	s_MaterialsBuffer.Bind(
-		BufferBaseTarget::ShaderStorageBuffer,
-		s_DeferredTransparentProgram.GetResourceLocation("sMaterialData"));
-
-	s_CameraDataBuffer.Bind(
-		BufferBaseTarget::UniformBuffer,
-		s_DeferredTransparentProgram.GetResourceLocation("uCameraData"));
-
-	s_LightsBuffer.Bind(
-		BufferBaseTarget::ShaderStorageBuffer,
-		s_DeferredTransparentProgram.GetResourceLocation("sPointLightsBuffer"),
-		0,
-		sizeof(PointLightData) * s_MaxPointLightsCount);
-
-	s_LightsBuffer.Bind(
-		BufferBaseTarget::ShaderStorageBuffer,
-		s_DeferredTransparentProgram.GetResourceLocation("sDirLightsBuffer"),
-		sizeof(PointLightData) * s_MaxPointLightsCount,
-		sizeof(DirLightData) * s_MaxDirLightsCount);
-
-	GL::Enable(EnableCap::DepthTest);
-	GL::DepthFunc(DepthFunction::LessEqual);
-	GL::DepthMask(false);
-
-	GL::Enable(EnableCap::Blend);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	for (auto &[model, drawData] : s_DrawData)
-	{
-		SortTransparentObjects(drawData.TransparentInstanceData);
-		DrawBatch(model, drawData.TransparentInstanceData);
-		drawData.TransparentInstanceData.clear();
-	}
-}
-
-static void ExecuteFogPass(const glm::vec4 &fogColor) noexcept
-{
-	NV_PROFILE_FUNC;
-
-	s_DeferredFogProgram.Use();
-	s_DeferredFogProgram.SetUniform("uFogColor", fogColor);
-
-	const std::array<GLuint, 2> textureIDs{
-		s_Framebuffer.GetAttachment(3).AttachmentID,
-		s_Framebuffer.GetAttachment(5).AttachmentID,
-	};
-	glBindTextures(0, textureIDs.size(), textureIDs.data());
-
-	GL::Disable(EnableCap::DepthTest);
-	GL::DepthMask(false);
-
-	glDrawArrays(GL_TRIANGLES, 0, 6);
-}
-
-void Renderer::Draw(
-	const glm::vec4 &clearColor,
-	const glm::vec4 &fogColor)
-{
-	NV_PROFILE_FUNC;
-
-	GL::DepthMask(true);
-
-	s_Framebuffer.Resize(s_CurrentDisplayWidth, s_CurrentDisplayHeight);
-	s_Framebuffer.Bind();
-	s_Framebuffer.ClearAttachment(0, clearColor);
-	s_Framebuffer.ClearAttachment(1, glm::zero<glm::vec4>());
-	s_Framebuffer.ClearAttachment(2, glm::zero<glm::vec4>());
-	s_Framebuffer.ClearAttachment(3, glm::zero<glm::vec4>());
-	s_Framebuffer.ClearAttachment(1.0f, 0);
-
-	glViewport(0, 0, s_CurrentDisplayWidth, s_CurrentDisplayHeight);
-	glScissor(0, 0, s_CurrentDisplayWidth, s_CurrentDisplayHeight);
-
-	s_FrameSync.WaitClient(SyncTimeoutInfinite);
-
-	s_CameraDataBuffer.Commit();
-	s_MaterialsBuffer.Commit();
-	s_LightsBuffer.Commit(
-		0,
-		sizeof(PointLightData) * s_PointLightsCount);
-	s_LightsBuffer.Commit(
-		sizeof(PointLightData) * s_MaxPointLightsCount,
-		sizeof(DirLightData) * s_DirLightsCount);
-
-	ExecuteGeometryPass();
-	ExecuteLightingPass();
-	ExecuteTransparentPass();
-	ExecuteFogPass(fogColor);
-
-	s_FrameSync.Set();
-
-	s_Framebuffer.Unbind();
-
-	s_PointLightsCount = 0;
-	s_DirLightsCount = 0;
-	s_Materials.clear();
-}
-
-GLuint Renderer::GetRenderTextureID(RenderTexture texture) noexcept
-{
-	return s_Framebuffer.GetAttachment((size_t)texture).AttachmentID;
-}
-
-void Renderer::DisplayFramebuffer() noexcept
-{
-	s_Framebuffer.Blit(Attachment::Color0);
-}
-
-void Renderer::SetDisplaySize(int width, int height) noexcept
-{
-	s_CurrentDisplayWidth = width;
-	s_CurrentDisplayHeight = height;
-}
-
-void Renderer::_Initialize(
-	int frameWidth,
-	int frameHeight,
-	GLADloadfunc getProcAddressFunc,
-	const RendererSettings &settings)
-{
-	NV_PROFILE_FUNC;
-
-	s_CurrentDisplayWidth = frameWidth;
-	s_CurrentDisplayHeight = frameHeight;
-
-	s_MaxPointLightsCount = settings.MaxPointLights;
-	s_MaxDirLightsCount = settings.MaxDirectionalLights;
-
-	if (!gladLoadGL(getProcAddressFunc))
-		throw std::runtime_error("Failed to load OpenGL bindings.");
-
-	RetrieveRendererInfo();
-
-	GL::Disable(EnableCap::Multisample);
-	GL::Enable(EnableCap::ScissorTest);
-	GL::Enable(EnableCap::CullFace);
-	GL::Enable(EnableCap::DebugOutput);
-	GL::Enable(EnableCap::DebugOutputSynchronous);
-	glFrontFace(GL_CCW);
-	glCullFace(GL_BACK);
-	glDebugMessageCallback(
-		[](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei, const GLchar *message, const void *)
-		{
-			switch (severity)
-			{
-			case GL_DEBUG_SEVERITY_HIGH:
+    switch (severity)
+    {
+    case GL_DEBUG_SEVERITY_HIGH:
+        NV_LOG_ERROR("OpenGL({}): {} - {}", DebugSourceToString(source), DebugTypeToString(type), message);
 #ifdef _DEBUG
-				__debugbreak();
+        __debugbreak();
 #endif
-				break;
-			case GL_DEBUG_SEVERITY_MEDIUM:
-				NV_LOG_WARNING("OpenGL: {}.\n", message);
-				break;
-			case GL_DEBUG_SEVERITY_LOW:
-				NV_LOG_INFO("OpenGL: {}.\n", message);
-				break;
-			}
-		},
-		nullptr);
-
-	const Rect viewportRect{0, 0, frameWidth, frameHeight};
-	SetViewport(viewportRect, viewportRect);
-
-	const std::array<uint8_t, 4> whiteTextureData{255, 255, 255, 255};
-	s_WhiteTexture = Texture(
-		TextureTarget::Texture2D,
-		TextureSpec{
-			.Size = {1, 1, 0},
-			.Format = InternalFormat::RGBA8,
-			.AllowBindless = true});
-	s_WhiteTexture.Upload(
-		TextureUploadInfo{
-			.Size = {1, 1, 0},
-			.PixelFormat = PixelFormat::RGBA,
-			.PixelType = PixelType::UnsignedByte},
-		whiteTextureData.data());
-	s_WhiteTexture.MakeResident();
-
-	s_DeferredGeometryProgram = CreateDeferredGeometryShaderProgram();
-	s_DeferredLightProgram = CreateDeferredLightingShaderProgram();
-	s_DeferredTransparentProgram = CreateDeferredTransparentShaderProgram();
-	s_DeferredFogProgram = CreateDeferredFogProgram();
-
-	s_InstanceBuffer = PersistentMappedBuffer(
-		sizeof(InstanceData) * 512,
-		BufferAccessFlags::Writable);
-	s_InstanceBuffer.SetDebugName("InstanceBuffer");
-
-	s_CameraDataBuffer = PersistentMappedBuffer(
-		sizeof(CameraData),
-		BufferAccessFlags::Writable);
-	s_CameraDataBuffer.SetDebugName("CameraBuffer");
-
-	s_MaterialsBuffer = PersistentMappedBuffer(
-		sizeof(Material) * settings.MaxMaterials,
-		BufferAccessFlags::Writable);
-	s_MaterialsBuffer.SetDebugName("MaterialsBuffer");
-
-	s_LightsBuffer = PersistentMappedBuffer(
-		sizeof(PointLightData) * settings.MaxPointLights + sizeof(DirLightData) * settings.MaxDirectionalLights,
-		BufferAccessFlags::Writable);
-	s_LightsBuffer.SetDebugName("LightsBuffer");
-
-	s_PointLights = s_LightsBuffer.GetBasePtr<PointLightData>();
-	s_DirLights = s_LightsBuffer.GetBasePtr<DirLightData>(sizeof(PointLightData) * settings.MaxPointLights);
-
-	s_VertexArray = VertexArray({
-		VertexInput{
-			.Stride = sizeof(ModelVertex),
-			.Descriptors = {
-				VertexDescriptor{
-					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inPosition"),
-					.AttributeType = AttributeType::Float,
-					.Count = 3,
-				},
-				VertexDescriptor{
-					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inNormal"),
-					.AttributeType = AttributeType::Float,
-					.Count = 3,
-				},
-				VertexDescriptor{
-					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inTexCoord"),
-					.AttributeType = AttributeType::Float,
-					.Count = 2,
-				},
-			},
-		},
-		VertexInput{
-			.Stride = sizeof(InstanceData),
-			.Descriptors = {
-				VertexDescriptor{
-					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inMaterialIndex"),
-					.AttributeType = AttributeType::UnsignedInt,
-					.Count = 1,
-				},
-				VertexDescriptor{
-					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inBindlessHandle"),
-					.AttributeType = AttributeType::UnsignedInt,
-					.Count = 2,
-				},
-				VertexDescriptor{
-					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inTransform"),
-					.AttributeType = AttributeType::Float,
-					.Count = 4,
-					.Rows = 4,
-				},
-				VertexDescriptor{
-					.AttributeIndex = s_DeferredGeometryProgram.GetResourceLocation("inNormalTransform"),
-					.AttributeType = AttributeType::Float,
-					.Count = 3,
-					.Rows = 3,
-				},
-			},
-			.BufferID = (BufferID)s_InstanceBuffer.GetID(),
-			.InstanceDivisor = 1,
-		},
-	});
-
-	s_Framebuffer = Framebuffer({
-		FramebufferAttachmentSpec{
-			.Width = frameWidth,
-			.Height = frameHeight,
-			.Format = InternalFormat::RGBA8,
-			.Flags = AttachmentFlags::DrawDest | AttachmentFlags::Resizable,
-		}, // [0] color + specular attachment
-		FramebufferAttachmentSpec{
-			.Width = frameWidth,
-			.Height = frameHeight,
-			.Format = InternalFormat::RGB16F,
-			.Flags = AttachmentFlags::DrawDest | AttachmentFlags::Resizable,
-		}, // [1] position attachment
-		FramebufferAttachmentSpec{
-			.Width = frameWidth,
-			.Height = frameHeight,
-			.Format = InternalFormat::RGB16F,
-			.Flags = AttachmentFlags::DrawDest | AttachmentFlags::Resizable,
-		}, // [2] normal attachment
-		FramebufferAttachmentSpec{
-			.Width = frameWidth,
-			.Height = frameHeight,
-			.Format = InternalFormat::RGB8,
-			.Flags = AttachmentFlags::DrawDest | AttachmentFlags::Resizable,
-		}, // [3] output color attachment
-		FramebufferAttachmentSpec{
-			.Width = frameWidth,
-			.Height = frameHeight,
-			.Format = InternalFormat::RGB8,
-			.Flags = AttachmentFlags::DrawDest | AttachmentFlags::Resizable,
-		}, // [4] final output
-		FramebufferAttachmentSpec{
-			.Width = frameWidth,
-			.Height = frameHeight,
-			.Format = InternalFormat::Depth24Stencil8,
-			.Flags = AttachmentFlags::Resizable,
-		}, // [5] depth attachment
-	});
+        break;
+    case GL_DEBUG_SEVERITY_MEDIUM:
+        NV_LOG_WARNING("OpenGL({}): {} - {}", DebugSourceToString(source), DebugTypeToString(type), message);
+        break;
+    case GL_DEBUG_SEVERITY_LOW:
+        NV_LOG_INFO("OpenGL({}): {} - {}", DebugSourceToString(source), DebugTypeToString(type), message);
+        break;
+    case GL_DEBUG_SEVERITY_NOTIFICATION:
+        NV_LOG_TRACE("OpenGL({}): {} - {}", DebugSourceToString(source), DebugTypeToString(type), message);
+    }
 }
 
-void Renderer::_Shutdown()
+static void SortTransparentObjects(std::span<Nova::InstanceData> instanceData, const glm::vec3 &cameraPosition) noexcept
 {
-	_GLObjectBase::DeleteAll();
+    NV_PROFILE_FUNC;
+
+    std::sort(
+        instanceData.begin(),
+        instanceData.end(),
+        [&](const auto &a, const auto &b)
+        {
+            const auto aDistance = glm::distance(glm::vec3(a.Transform[3]), cameraPosition);
+            const auto bDistance = glm::distance(glm::vec3(b.Transform[3]), cameraPosition);
+            return aDistance > bDistance;
+        });
+}
+
+static Nova::GLContext CreateContextAndLoadGL(const Nova::Window &window)
+{
+    NV_PROFILE_FUNC;
+
+    auto context = Nova::GLContext(window.GetData(), 4, 5);
+    context.MakeCurrent();
+    context.LoadGL();
+
+    return context;
+}
+
+static Nova::RendererInfo RetrieveRendererInfo() noexcept
+{
+    NV_PROFILE_FUNC;
+
+    return {
+        .VendorName = std::string(Nova::GL::GetString(Nova::StringName::Vendor)),
+        .RendererName = std::string(Nova::GL::GetString(Nova::StringName::Renderer)),
+        .Version = std::string(Nova::GL::GetString(Nova::StringName::Version)),
+        .GLSLVersion = std::string(Nova::GL::GetString(Nova::StringName::ShadingLanguageVersion)),
+    };
+}
+
+static Nova::Texture CreateWhiteTexture()
+{
+    NV_PROFILE_FUNC;
+
+    constexpr std::array<unsigned char, 4> whiteTextureData{255, 255, 255, 255};
+    auto texture = Nova::Texture(
+        Nova::TextureTarget::Texture2D,
+        Nova::TextureSpec{
+            .Size = {1, 1, 0},
+            .Format = Nova::InternalFormat::RGBA8});
+    texture.Upload(
+        Nova::TextureUploadInfo{
+            .Size = {1, 1, 0},
+            .PixelFormat = Nova::PixelFormat::RGBA,
+            .PixelType = Nova::PixelType::UnsignedByte},
+        whiteTextureData.data(),
+        true);
+
+    return texture;
+}
+
+static Nova::Framebuffer CreateFramebuffer(int width, int height)
+{
+    NV_PROFILE_FUNC;
+
+    return Nova::Framebuffer({
+        Nova::FramebufferAttachmentSpec{
+            .Width = width,
+            .Height = height,
+            .Format = Nova::InternalFormat::RGBA8,
+            .Flags = Nova::AttachmentFlags::DrawDest | Nova::AttachmentFlags::Resizable,
+        }, // [0] color + specular attachment
+        Nova::FramebufferAttachmentSpec{
+            .Width = width,
+            .Height = height,
+            .Format = Nova::InternalFormat::RGB16F,
+            .Flags = Nova::AttachmentFlags::DrawDest | Nova::AttachmentFlags::Resizable,
+        }, // [1] position attachment
+        Nova::FramebufferAttachmentSpec{
+            .Width = width,
+            .Height = height,
+            .Format = Nova::InternalFormat::RGB16F,
+            .Flags = Nova::AttachmentFlags::DrawDest | Nova::AttachmentFlags::Resizable,
+        }, // [2] normal attachment
+        Nova::FramebufferAttachmentSpec{
+            .Width = width,
+            .Height = height,
+            .Format = Nova::InternalFormat::RGB8,
+            .Flags = Nova::AttachmentFlags::DrawDest | Nova::AttachmentFlags::Resizable,
+        }, // [3] output color attachment
+        Nova::FramebufferAttachmentSpec{
+            .Width = width,
+            .Height = height,
+            .Format = Nova::InternalFormat::RGB8,
+            .Flags = Nova::AttachmentFlags::DrawDest | Nova::AttachmentFlags::Resizable,
+        }, // [4] final output
+        Nova::FramebufferAttachmentSpec{
+            .Width = width,
+            .Height = height,
+            .Format = Nova::InternalFormat::RGB8,
+            .Flags = Nova::AttachmentFlags::DrawDest | Nova::AttachmentFlags::Resizable,
+        }, // [5] shininess
+        Nova::FramebufferAttachmentSpec{
+            .Width = width,
+            .Height = height,
+            .Format = Nova::InternalFormat::Depth24Stencil8,
+            .Flags = Nova::AttachmentFlags::Resizable,
+        }, // [6] depth attachment
+    });
+}
+
+static Nova::ShaderProgram CreateDeferredGeometryProgram()
+{
+    NV_PROFILE_FUNC;
+
+    auto program = Nova::ShaderProgram(
+        {
+            Nova::ShaderStage::FromGLSL(
+                Nova::ShaderType::Vertex,
+                std::filesystem::path("./assets/shaders/deferredGeometry.vert")),
+            Nova::ShaderStage::FromGLSL(
+                Nova::ShaderType::Fragment,
+                std::filesystem::path("./assets/shaders/deferredGeometry.frag")),
+        },
+        {
+            {"outColor", albedoAttachmentIndex},
+            {"outPosition", positionAttachmentIndex},
+            {"outNormal", normalAttachmentIndex},
+            {"outShininess", shininessAttachmentIndex},
+        });
+    program.SetDebugName("GeometryProgram");
+
+    return program;
+}
+
+static Nova::ShaderProgram CreateDeferredLightProgram(const Nova::Framebuffer &framebuffer, Nova::BindlessTextureBinder &textureBinder)
+{
+    NV_PROFILE_FUNC;
+
+    auto program = Nova::ShaderProgram(
+        {
+            Nova::ShaderStage::FromGLSL(
+                Nova::ShaderType::Vertex,
+                std::filesystem::path("./assets/shaders/deferredLighting.vert")),
+            Nova::ShaderStage::FromGLSL(
+                Nova::ShaderType::Fragment,
+                std::filesystem::path("./assets/shaders/deferredLighting.frag")),
+        },
+        {
+            {"outColor", colorAttachmentIndex},
+        });
+    program.SetUniform(
+        "uGBufferAlbedoSpecular",
+        textureBinder.Bind(framebuffer.GetAttachment(albedoAttachmentIndex), true));
+    program.SetUniform(
+        "uGBufferPosition",
+        textureBinder.Bind(framebuffer.GetAttachment(positionAttachmentIndex), true));
+    program.SetUniform(
+        "uGBufferNormal",
+        textureBinder.Bind(framebuffer.GetAttachment(normalAttachmentIndex), true));
+    program.SetUniform(
+        "uGBufferShininess",
+        textureBinder.Bind(framebuffer.GetAttachment(shininessAttachmentIndex), true));
+    program.SetDebugName("LightProgram");
+
+    return program;
+}
+
+static Nova::ShaderProgram CreateDeferredTransparentProgram()
+{
+    NV_PROFILE_FUNC;
+
+    auto program = Nova::ShaderProgram(
+        {
+            Nova::ShaderStage::FromGLSL(
+                Nova::ShaderType::Vertex,
+                std::filesystem::path("./assets/shaders/deferredTransparent.vert")),
+            Nova::ShaderStage::FromGLSL(
+                Nova::ShaderType::Fragment,
+                std::filesystem::path("./assets/shaders/deferredTransparent.frag")),
+        },
+        {
+            {"outColor", colorAttachmentIndex},
+        });
+    program.SetDebugName("TransparentProgram");
+
+    return program;
+}
+
+static Nova::ShaderProgram CreateDeferredFogProgram(const Nova::Framebuffer &framebuffer, Nova::BindlessTextureBinder &textureBinder)
+{
+    NV_PROFILE_FUNC;
+
+    auto program = Nova::ShaderProgram(
+        {
+            Nova::ShaderStage::FromGLSL(
+                Nova::ShaderType::Vertex,
+                std::filesystem::path("./assets/shaders/deferredFog.vert")),
+            Nova::ShaderStage::FromGLSL(
+                Nova::ShaderType::Fragment,
+                std::filesystem::path("./assets/shaders/deferredFog.frag")),
+        },
+        {
+            {"outColor", finalAttachmentIndex},
+        });
+    program.SetUniform(
+        "uSceneColor",
+        textureBinder.Bind(framebuffer.GetAttachment(colorAttachmentIndex), true));
+    program.SetUniform(
+        "uDepth",
+        textureBinder.Bind(framebuffer.GetAttachment(depthAttachmentIndex), true));
+    program.SetDebugName("FogProgram");
+
+    return program;
+}
+
+static Nova::ShaderProgram CreateSkyboxProgram()
+{
+    NV_PROFILE_FUNC;
+
+    auto program = Nova::ShaderProgram(
+        {
+            Nova::ShaderStage::FromGLSL(
+                Nova::ShaderType::Vertex,
+                std::filesystem::path("./assets/shaders/skybox.vert")),
+            Nova::ShaderStage::FromGLSL(
+                Nova::ShaderType::Fragment,
+                std::filesystem::path("./assets/shaders/skybox.frag")),
+        },
+        {
+            {"outColor", colorAttachmentIndex},
+        });
+    program.SetDebugName("SkyboxProgram");
+
+    return program;
+}
+
+static Nova::Buffer CreateInstanceBuffer()
+{
+    NV_PROFILE_FUNC;
+
+    auto buffer = Nova::Buffer(
+        sizeof(Nova::InstanceData) * maxInstanceCount,
+        Nova::BufferAccessFlags::Writable);
+    buffer.SetDebugName("InstanceBuffer");
+
+    return buffer;
+}
+
+static Nova::Buffer CreateCameraBuffer()
+{
+    NV_PROFILE_FUNC;
+
+    auto buffer = Nova::Buffer(sizeof(Nova::CameraData), Nova::BufferAccessFlags::Writable);
+    buffer.SetDebugName("CameraBuffer");
+
+    return buffer;
+}
+
+static Nova::Buffer CreateMaterialsBuffer()
+{
+    NV_PROFILE_FUNC;
+
+    auto buffer = Nova::Buffer(
+        sizeof(Nova::MaterialData) * maxMaterialsCount,
+        Nova::BufferAccessFlags::Writable);
+    buffer.SetDebugName("MaterialsBuffer");
+
+    return buffer;
+}
+
+static Nova::Buffer CreateLightsBuffer()
+{
+    NV_PROFILE_FUNC;
+
+    auto buffer = Nova::Buffer(
+        sizeof(Nova::PointLightData) * maxPointLights + sizeof(Nova::DirLightData) * maxDirLights,
+        Nova::BufferAccessFlags::Writable);
+    buffer.SetDebugName("LightsBuffer");
+
+    return buffer;
+}
+
+static Nova::VertexArray CreateVertexArray(const Nova::ShaderProgram &geometryProgram, const Nova::Buffer &instanceBuffer)
+{
+    NV_PROFILE_FUNC;
+
+    return Nova::VertexArray({
+        Nova::VertexInput{
+            .Stride = sizeof(Nova::ModelVertexData),
+            .Descriptors = {
+                Nova::VertexDescriptor{
+                    .AttributeIndex = geometryProgram.GetResourceLocation("inPosition"),
+                    .AttributeType = Nova::AttributeType::Float,
+                    .Count = 3,
+                },
+                Nova::VertexDescriptor{
+                    .AttributeIndex = geometryProgram.GetResourceLocation("inNormal"),
+                    .AttributeType = Nova::AttributeType::Float,
+                    .Count = 3,
+                },
+                Nova::VertexDescriptor{
+                    .AttributeIndex = geometryProgram.GetResourceLocation("inTexCoord"),
+                    .AttributeType = Nova::AttributeType::Float,
+                    .Count = 2,
+                },
+            },
+        },
+        Nova::VertexInput{
+            .Stride = sizeof(Nova::InstanceData),
+            .Descriptors = {
+                Nova::VertexDescriptor{
+                    .AttributeIndex = geometryProgram.GetResourceLocation("inMaterialIndex"),
+                    .AttributeType = Nova::AttributeType::UnsignedInt,
+                    .Count = 1,
+                },
+                Nova::VertexDescriptor{
+                    .AttributeIndex = geometryProgram.GetResourceLocation("inTransform"),
+                    .AttributeType = Nova::AttributeType::Float,
+                    .Count = 4,
+                    .Rows = 4,
+                },
+                Nova::VertexDescriptor{
+                    .AttributeIndex = geometryProgram.GetResourceLocation("inNormalTransform"),
+                    .AttributeType = Nova::AttributeType::Float,
+                    .Count = 3,
+                    .Rows = 3,
+                },
+            },
+            .BufferID = instanceBuffer.GetID(),
+            .InstanceDivisor = 1,
+        },
+    });
+}
+
+Nova::Renderer::Renderer(const Window &window)
+    : context_(CreateContextAndLoadGL(window)),
+      info_(RetrieveRendererInfo()),
+      // TODO Check if context supports bindless textures
+      textureBinder_(maxTextureHandleAge * static_cast<unsigned int>(context_.GetRefreshRate())),
+      whiteTexture_(CreateWhiteTexture()),
+      whiteTextureHandle_(textureBinder_.Bind(whiteTexture_, true)),
+      framebuffer_(CreateFramebuffer(window.GetWidth(), window.GetHeight())),
+      deferredGeometryProgram_(CreateDeferredGeometryProgram()),
+      deferredLightProgram_(CreateDeferredLightProgram(framebuffer_, textureBinder_)),
+      deferredTransparentProgram_(CreateDeferredTransparentProgram()),
+      deferredFogProgram_(CreateDeferredFogProgram(framebuffer_, textureBinder_)),
+      skyboxProgram_(CreateSkyboxProgram()),
+      instanceBuffer_(CreateInstanceBuffer()),
+      instanceBufferData_(instanceBuffer_.GetRegion<InstanceData>(0, sizeof(InstanceData) * maxInstanceCount)),
+      cameraBuffer_(CreateCameraBuffer()),
+      materialsBuffer_(CreateMaterialsBuffer()),
+      materialsBufferData_(materialsBuffer_.GetRegion<MaterialData>(0, sizeof(MaterialData) * maxMaterialsCount)),
+      lightsBuffer_(CreateLightsBuffer()),
+      pointLightsData_(lightsBuffer_.GetRegion<PointLightData>(0, maxPointLights * sizeof(PointLightData))),
+      dirLightsData_(lightsBuffer_.GetRegion<DirLightData>(pointLightsData_.GetCapacityBytes(), maxDirLights * sizeof(DirLightData))),
+      vertexArray_(CreateVertexArray(deferredGeometryProgram_, instanceBuffer_))
+{
+    const auto width = window.GetWidth();
+    const auto height = window.GetHeight();
+
+    frameInfo_.Width = width;
+    frameInfo_.Height = height;
+
+    GL::Disable(EnableCap::Multisample);
+    GL::Enable(EnableCap::ScissorTest);
+    GL::Enable(EnableCap::CullFace);
+    GL::Enable(EnableCap::DebugOutput);
+    GL::Enable(EnableCap::DebugOutputSynchronous);
+    GL::FrontFace(WindingOrder::CounterClockwise);
+    GL::CullFace(Face::Back);
+    GL::Viewport(0, 0, width, height);
+    GL::Scissor(0, 0, width, height);
+    // TODO move glDebugMessageCallback to GL.hpp
+    glDebugMessageCallback(DebugMessageCallback, nullptr);
+
+    ShaderProgram::ReleaseShaderCompiler();
+}
+
+Nova::Renderer::~Renderer() noexcept
+{
+    textureBinder_.UnbindAll(true);
+}
+
+void Nova::Renderer::Clear(float r, float g, float b, float a) const noexcept
+{
+    NV_PROFILE_FUNC;
+
+    GL::ClearColor(r, g, b, a);
+    GL::Clear(ClearMask::ColorBufferBit | ClearMask::DepthBufferBit);
+}
+
+void Nova::Renderer::SetCamera(const glm::mat4 &view, const glm::mat4 &projection) noexcept
+{
+    NV_PROFILE_FUNC;
+
+    const auto cameraPosition = ExtractCameraPosition(view);
+    cameraPosition_ = cameraPosition;
+
+    auto cameraRegion = cameraBuffer_.GetRegion<CameraData>();
+    auto cameraData = cameraRegion.GetBasePtr();
+    cameraData->ViewMatrix = view;
+    cameraData->ProjectionMatrix = projection;
+    cameraData->Position = cameraPosition;
+
+    const auto [zNear, zFar] = ExtractZPlanes(projection);
+    cameraData->ZNear = zNear;
+    cameraData->ZFar = zFar;
+
+    cameraRegion.Commit();
+}
+
+void Nova::Renderer::SetCamera(
+    const glm::mat4 &view,
+    const glm::mat4 &projection,
+    const glm::vec3 &position,
+    float zNear,
+    float zFar) noexcept
+{
+    NV_PROFILE_FUNC;
+
+    cameraPosition_ = position;
+
+    auto cameraRegion = cameraBuffer_.GetRegion<CameraData>();
+    auto cameraData = cameraRegion.GetBasePtr();
+    cameraData->ViewMatrix = view;
+    cameraData->ProjectionMatrix = projection;
+    cameraData->Position = position;
+    cameraData->ZNear = zNear;
+    cameraData->ZFar = zFar;
+
+    cameraRegion.Commit();
+}
+
+void Nova::Renderer::SetViewport(const Rect<unsigned int> &viewport) noexcept
+{
+    NV_PROFILE_FUNC;
+
+    frameInfo_.Viewport = viewport;
+
+    GL::Viewport(
+        viewport.X,
+        viewport.Y,
+        viewport.Width,
+        viewport.Height);
+}
+
+void Nova::Renderer::SetViewport(
+    const Rect<unsigned int> &viewport,
+    const Rect<unsigned int> &scissor) noexcept
+{
+    NV_PROFILE_FUNC;
+
+    frameInfo_.Viewport = viewport;
+    frameInfo_.Scissor = scissor;
+
+    GL::Viewport(
+        viewport.X,
+        viewport.Y,
+        viewport.Width,
+        viewport.Height);
+    GL::Scissor(
+        scissor.X,
+        scissor.Y,
+        scissor.Width,
+        scissor.Height);
+}
+
+void Nova::Renderer::AddPointLight(
+    const glm::vec4 &color,
+    const glm::vec3 &position,
+    float radius) noexcept
+{
+    if (!pointLightsData_.IsFull())
+    {
+        auto lightData = pointLightsData_.GetCurrentPtr();
+        lightData->Color = color;
+        lightData->Position = position;
+        lightData->Radius = radius;
+
+        pointLightsData_.Increment();
+    }
+}
+
+void Nova::Renderer::AddDirectionalLight(
+    const glm::vec4 &color,
+    const glm::vec3 &direction)
+{
+    if (!dirLightsData_.IsFull())
+    {
+        auto lightData = dirLightsData_.GetCurrentPtr();
+        lightData->Color = color;
+        lightData->Direction = direction;
+
+        dirLightsData_.Increment();
+    }
+}
+
+void Nova::Renderer::Render(
+    std::shared_ptr<Buffer> modelBuffer,
+    const Material &material,
+    const glm::mat4 &transform)
+{
+    Render(
+        modelBuffer,
+        material,
+        transform,
+        // TODO This should not be a responsibility of the renderer !!!
+        BuildNormalTransformMatrix(transform));
+}
+
+void Nova::Renderer::Render(
+    std::shared_ptr<Buffer> modelBuffer,
+    const Material &material,
+    const glm::mat4 &transform,
+    const glm::mat3 &transformNormal)
+{
+    auto &instanceData = GetInstanceDataForModel(
+        modelBuffer,
+        material.Color.a == 0.0f);
+    instanceData.emplace_back(
+        InstanceData{
+            .MaterialIndex = GetMaterialIndex(material),
+            .Transform = transform,
+            .NormalTransform = transformNormal,
+        });
+}
+
+void Nova::Renderer::Draw(
+    unsigned int frameWidth,
+    unsigned int frameHeight,
+    std::shared_ptr<Texture> skyboxTexture)
+{
+    if (frameWidth != frameInfo_.Width || frameHeight != frameInfo_.Height)
+    {
+        for (const auto &attachment : framebuffer_.GetAttachments())
+            textureBinder_.Unbind(attachment, true);
+
+        framebuffer_.Resize(frameWidth, frameHeight);
+
+        deferredLightProgram_.SetUniform(
+            "uGBufferAlbedoSpecular",
+            textureBinder_.Bind(framebuffer_.GetAttachment(albedoAttachmentIndex), true));
+        deferredLightProgram_.SetUniform(
+            "uGBufferPosition",
+            textureBinder_.Bind(framebuffer_.GetAttachment(positionAttachmentIndex), true));
+        deferredLightProgram_.SetUniform(
+            "uGBufferNormal",
+            textureBinder_.Bind(framebuffer_.GetAttachment(normalAttachmentIndex), true));
+        deferredLightProgram_.SetUniform(
+            "uGBufferShininess",
+            textureBinder_.Bind(framebuffer_.GetAttachment(shininessAttachmentIndex), true));
+        deferredFogProgram_.SetUniform(
+            "uSceneColor",
+            textureBinder_.Bind(framebuffer_.GetAttachment(colorAttachmentIndex), true));
+        deferredFogProgram_.SetUniform(
+            "uDepth",
+            textureBinder_.Bind(framebuffer_.GetAttachment(depthAttachmentIndex), true));
+
+        frameInfo_.Width = frameWidth;
+        frameInfo_.Height = frameHeight;
+    }
+
+    textureBinder_.Update();
+    framebuffer_.Bind();
+
+    GL::DepthMask(true);
+
+    framebuffer_.ClearAttachment(albedoAttachmentIndex, frameInfo_.ClearColor);
+    framebuffer_.ClearAttachment(positionAttachmentIndex, glm::vec4(0.0f));
+    framebuffer_.ClearAttachment(normalAttachmentIndex, glm::vec4(0.0f));
+    framebuffer_.ClearAttachment(colorAttachmentIndex, glm::vec4(0.0f));
+    framebuffer_.ClearAttachment(finalAttachmentIndex, glm::vec4(0.0f));
+    framebuffer_.ClearAttachment(shininessAttachmentIndex, glm::vec4(0.0f));
+    framebuffer_.ClearAttachment(1.0f, 0);
+
+    vertexArray_.Use();
+
+    frameSync_.WaitClient(SyncTimeoutInfinite);
+
+    materialsBufferData_.Commit();
+    const auto pointLightsCount = static_cast<GLuint>(pointLightsData_.Commit());
+    const auto dirLightsCount = static_cast<GLuint>(dirLightsData_.Commit());
+
+    // geometry pass
+    materialsBuffer_.Bind(
+        BufferBaseTarget::ShaderStorageBuffer,
+        deferredGeometryProgram_.GetResourceLocation("sMaterialData"));
+    cameraBuffer_.Bind(
+        BufferBaseTarget::UniformBuffer,
+        deferredGeometryProgram_.GetResourceLocation("uCameraData"));
+
+    deferredGeometryProgram_.Use();
+
+    GL::Disable(EnableCap::Blend);
+    GL::Enable(EnableCap::DepthTest);
+    GL::DepthFunc(DepthFunction::LessEqual);
+    GL::DepthMask(true);
+
+    for (auto &[model, drawData] : drawData_)
+    {
+        DrawBatch(model, drawData.OpaqueInstanceData);
+        drawData.OpaqueInstanceData.clear();
+    }
+
+    // lighting pass
+    // TODO Get ambient intensity from frame config
+    deferredLightProgram_.SetUniform("uAmbient", 0.5f);
+    deferredLightProgram_.SetUniform("uPointLightsCount", pointLightsCount);
+    deferredLightProgram_.SetUniform("uDirLightsCount", dirLightsCount);
+    deferredLightProgram_.Use();
+
+    lightsBuffer_.Bind(
+        BufferBaseTarget::ShaderStorageBuffer,
+        deferredLightProgram_.GetResourceLocation("sPointLightsBuffer"),
+        0,
+        sizeof(PointLightData) * maxPointLights);
+    lightsBuffer_.Bind(
+        BufferBaseTarget::ShaderStorageBuffer,
+        deferredLightProgram_.GetResourceLocation("sDirLightsBuffer"),
+        sizeof(PointLightData) * maxPointLights,
+        sizeof(DirLightData) * maxDirLights);
+
+    cameraBuffer_.Bind(
+        BufferBaseTarget::UniformBuffer,
+        deferredLightProgram_.GetResourceLocation("uCameraData"));
+
+    GL::Disable(EnableCap::DepthTest);
+    GL::DepthMask(false);
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    framebuffer_.Invalidate({
+        GL_COLOR_ATTACHMENT0,
+        GL_COLOR_ATTACHMENT1,
+        GL_COLOR_ATTACHMENT2,
+    });
+
+    // skybox pass
+    if (skyboxTexture != nullptr)
+    {
+        skyboxProgram_.Use();
+        skyboxProgram_.SetUniform("uSkybox", textureBinder_.Bind(*skyboxTexture));
+
+        GL::Enable(EnableCap::DepthTest);
+        GL::DepthFunc(DepthFunction::LessEqual);
+        GL::DepthMask(false);
+
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+    }
+
+    // transparent pass
+    const auto hasAnyTransparentObjects = std::any_of(
+        drawData_.begin(),
+        drawData_.end(),
+        [](const auto &x)
+        {
+            return x.second.TransparentInstanceData.size() > 0;
+        });
+    if (hasAnyTransparentObjects)
+    {
+        deferredTransparentProgram_.SetUniform("uAmbient", 0.5f);
+        deferredTransparentProgram_.SetUniform("uPointLightsCount", pointLightsCount);
+        deferredTransparentProgram_.SetUniform("uDirLightsCount", dirLightsCount);
+        deferredTransparentProgram_.Use();
+
+        materialsBuffer_.Bind(
+            BufferBaseTarget::ShaderStorageBuffer,
+            deferredTransparentProgram_.GetResourceLocation("sMaterialData"));
+
+        cameraBuffer_.Bind(
+            BufferBaseTarget::UniformBuffer,
+            deferredTransparentProgram_.GetResourceLocation("uCameraData"));
+
+        lightsBuffer_.Bind(
+            BufferBaseTarget::ShaderStorageBuffer,
+            deferredTransparentProgram_.GetResourceLocation("sPointLightsBuffer"),
+            0,
+            sizeof(PointLightData) * maxPointLights);
+
+        lightsBuffer_.Bind(
+            BufferBaseTarget::ShaderStorageBuffer,
+            deferredTransparentProgram_.GetResourceLocation("sDirLightsBuffer"),
+            sizeof(PointLightData) * maxPointLights,
+            sizeof(DirLightData) * maxDirLights);
+
+        GL::Enable(EnableCap::DepthTest);
+        GL::DepthFunc(DepthFunction::LessEqual);
+        GL::DepthMask(false);
+
+        GL::Enable(EnableCap::Blend);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        for (auto &[model, drawData] : drawData_)
+        {
+            SortTransparentObjects(drawData.TransparentInstanceData, cameraPosition_);
+            DrawBatch(model, drawData.TransparentInstanceData);
+            drawData.TransparentInstanceData.clear();
+        }
+    }
+
+    // fog pass
+    deferredFogProgram_.Use();
+    // TODO Get fog color from frame settings
+    deferredFogProgram_.SetUniform("uFogColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.01f));
+
+    GL::Disable(EnableCap::DepthTest);
+    GL::DepthMask(false);
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    frameSync_.Set();
+    framebuffer_.Unbind();
+    materialsCache_.clear();
+}
+
+void Nova::Renderer::DisplayFramebuffer(const Window &window) const noexcept
+{
+    const auto &finalAttachment = framebuffer_.GetAttachment(finalAttachmentIndex);
+    glNamedFramebufferReadBuffer(
+        framebuffer_.GetID(),
+        GL_COLOR_ATTACHMENT0 + finalAttachmentIndex);
+    glBlitNamedFramebuffer(
+        framebuffer_.GetID(),
+        0,
+        0,
+        0,
+        finalAttachment.GetWidth(),
+        finalAttachment.GetHeight(),
+        0,
+        0,
+        window.GetWidth(),
+        window.GetHeight(),
+        GL_COLOR_BUFFER_BIT,
+        GL_NEAREST);
+}
+
+std::vector<Nova::InstanceData> &Nova::Renderer::GetInstanceDataForModel(std::shared_ptr<Buffer> modelBuffer, bool useAlpha) noexcept
+{
+    const auto &it = drawData_.find(modelBuffer);
+    if (it != drawData_.end())
+        return useAlpha
+                   ? it->second.TransparentInstanceData
+                   : it->second.OpaqueInstanceData;
+
+    const auto &[data, _] = drawData_.emplace(modelBuffer, DrawData{.Age = 0});
+    return useAlpha
+               ? data->second.TransparentInstanceData
+               : data->second.OpaqueInstanceData;
+}
+
+GLuint Nova::Renderer::GetMaterialIndex(const Nova::Material &material)
+{
+    const auto albedoHandle = material.AlbedoTexture == nullptr
+                                  ? whiteTextureHandle_
+                                  : textureBinder_.Bind(*material.AlbedoTexture);
+
+    const MaterialData materialData{
+        .Color = material.Color,
+        .SpecularIntensity = material.SpecularIntensity,
+        .Shininess = material.Shininess,
+        // TODO Check if we can just use 64-bit int, possibly swapping high and low order words
+        .AlbedoHandleHigh = static_cast<GLuint>(albedoHandle & 0xffffffffzu),
+        .AlbedoHandleLow = static_cast<GLuint>(albedoHandle >> 32zu),
+    };
+
+    const auto it = materialsCache_.find(materialData);
+    if (it != materialsCache_.end())
+        return it->second;
+
+    const auto materialIndex = materialsBufferData_.GetSize();
+
+    auto dataPtr = materialsBufferData_.GetCurrentPtr();
+    *dataPtr = materialData;
+
+    materialsBufferData_.Increment();
+
+    return materialIndex;
+}
+
+void Nova::Renderer::DrawBatch(const std::shared_ptr<Buffer> &modelBuffer, std::span<const InstanceData> instanceData) noexcept
+{
+    vertexArray_.BindVertexBuffer(
+        *modelBuffer,
+        modelBufferBinding,
+        sizeof(ModelVertexData));
+
+    // TODO If instance data transfer doesn't overlap the currently rendered region, dont synchronize, just get next region and use gldraw*baseinstance. synchronize all regions from previous frame before draw
+    instanceDataSync_.WaitClient(SyncTimeoutInfinite);
+
+    auto instanceDataRegion = instanceBuffer_.GetRegion<InstanceData>(0, sizeof(InstanceData) * maxInstanceCount);
+    instanceDataRegion.Copy(instanceData);
+    instanceDataRegion.Commit();
+
+    assert_fits_in<GLsizei>(modelBuffer->GetSize());
+    assert_fits_in<GLsizei>(instanceData.size());
+
+    glDrawArraysInstanced(
+        GL_TRIANGLES,
+        0,
+        static_cast<GLsizei>(modelBuffer->GetSize()) / sizeof(ModelVertexData),
+        static_cast<GLsizei>(instanceData.size()));
+
+    instanceDataSync_.Set();
 }

@@ -217,12 +217,10 @@ bool ShaderProgram::IsProgramBinarySupported() noexcept
 	return s_IsSupported;
 }
 
-void ShaderProgram::Delete() noexcept
+Nova::ShaderProgram::~ShaderProgram() noexcept
 {
-	NV_PROFILE_FUNC;
-
-	glDeleteProgram(id_);
-	id_ = 0;
+	if (id_)
+		glDeleteProgram(id_);
 }
 
 void ShaderProgram::Use() const
@@ -271,15 +269,13 @@ ShaderProgram ShaderProgram::FromBinary(
 	return FromBinary(binaryFormat, data.data(), data.size() * sizeof(std::byte));
 }
 
-ShaderProgram::ShaderProgram(
-	const ShaderStage *stages,
-	size_t stagesCount)
+ShaderProgram::ShaderProgram(std::span<const ShaderStage> stages)
 {
 	NV_PROFILE_FUNC;
 
 	id_ = glCreateProgram();
 
-	for (const auto &stage : std::span(stages, stagesCount))
+	for (const auto &stage : stages)
 		glAttachShader(id_, stage.GetID());
 
 	{
@@ -292,6 +288,40 @@ ShaderProgram::ShaderProgram(
 
 	resources_ = RetrieveProgramInterface(id_);
 }
+
+ShaderProgram::ShaderProgram(std::initializer_list<ShaderStage> stages)
+	: ShaderProgram(std::span(stages)) {}
+
+ShaderProgram::ShaderProgram(std::span<const ShaderStage> stages, std::span<const OutputLocation> outputs)
+{
+	NV_PROFILE_FUNC;
+
+	id_ = glCreateProgram();
+
+	for (const auto &stage : stages)
+		glAttachShader(id_, stage.GetID());
+
+	for (const auto &output : outputs)
+		glBindFragDataLocation(id_, output.Location, output.Name.c_str());
+
+	{
+		NV_PROFILE_SCOPE("::LinkShaderProgram");
+		glLinkProgram(id_);
+	}
+
+	CleanUpAttachedShaders(id_);
+	CheckProgramLinkStatus(id_);
+
+	resources_ = RetrieveProgramInterface(id_);
+}
+
+ShaderProgram::ShaderProgram(std::initializer_list<ShaderStage> stages, std::initializer_list<OutputLocation> outputs)
+	: ShaderProgram(std::span(stages), std::span(outputs)) {}
+
+ShaderProgram::ShaderProgram(ShaderProgram &&other) noexcept
+	: resources_(std::move(other.resources_)),
+	  savedBinary_(std::move(other.savedBinary_)),
+	  id_(other.id_) {}
 
 std::pair<const std::span<std::byte>, GLenum> ShaderProgram::GetBinary()
 {

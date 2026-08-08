@@ -21,7 +21,7 @@ namespace Nova
 
         static void FreeLoadingData(void *loadingData) noexcept { delete (ModelLoadingData *)loadingData; }
 
-        static void PreLoad(std::shared_ptr<Asset> asset, void *loadingData) noexcept {}
+        static void PreLoad(std::shared_ptr<Asset>, void *) noexcept {}
 
         static void Load(std::shared_ptr<Asset> asset, void *loadingData) noexcept;
 

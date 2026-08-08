@@ -1,6 +1,6 @@
 #pragma once
-#include <Nova/graphics/opengl/Buffer.hpp>
 #include <Nova/graphics/opengl/VertexDescriptor.hpp>
+#include <Nova/graphics/opengl/Buffer.hpp>
 #include <vector>
 #include <optional>
 #include <iterator>
@@ -42,6 +42,8 @@ namespace Nova
 			std::initializer_list<VertexInput> layout,
 			const Buffer &elementBuffer);
 
+		~VertexArray() noexcept;
+
 		void AddVertexInput(const VertexInput &vertexInput);
 
 		void AddVertexInput(
@@ -59,8 +61,6 @@ namespace Nova
 
 		void BindElementBuffer(const Buffer &buffer) const noexcept;
 
-		void Delete() noexcept;
-
 		VertexArray &operator=(const VertexArray &) = delete;
 
 		VertexArray &operator=(VertexArray &&other) noexcept
@@ -75,7 +75,7 @@ namespace Nova
 	private:
 		std::unordered_map<GLuint, GLuint> bufferBindings_;
 		std::vector<GLuint> usedBufferBindings_;
-		GLuint id_;
+		GLuint id_ = 0;
 
 		GLuint FindNextFreeBindingIndex();
 	};

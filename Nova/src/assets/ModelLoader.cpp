@@ -88,7 +88,7 @@ static void LoadFromFile(ModelLoadingData *loadingData, const std::filesystem::p
     }
 }
 
-static void LoadFromMemory(ModelLoadingData *loadingData, std::span<const uint8_t> data)
+static void LoadFromMemory(ModelLoadingData *, std::span<const uint8_t>)
 {
     // TODO Implement
 }
@@ -105,7 +105,7 @@ void OBJModelLoader::Load(std::shared_ptr<Asset> asset, void *loadingData) noexc
             {
                 LoadFromFile(loadingData_, filepath);
             },
-            [](const std::vector<std::filesystem::path> &filepaths)
+            [](const std::vector<std::filesystem::path> &)
             {
                 NV_LOG_ERROR("Loading models from file list is not supported.");
             },
@@ -124,9 +124,8 @@ void OBJModelLoader::PostLoad(std::shared_ptr<Asset> asset, void *loadingData) n
     auto asset_ = std::static_pointer_cast<Model>(asset);
 
     asset_->SetModelBuffer(
-        Buffer(
+        std::make_shared<Buffer>(
             sizeof(ModelVertex) * loadingData_->ModelVertices.size(),
-            false,
-            false,
+            BufferAccessFlags::None,
             loadingData_->ModelVertices.data()));
 }

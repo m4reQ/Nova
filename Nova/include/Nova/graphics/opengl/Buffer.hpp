@@ -1,136 +1,112 @@
 #pragma once
-#include <Nova/graphics/opengl/BufferView.hpp>
-#include <glm/gtc/type_ptr.hpp>
+#include <Nova/core/Utility.hpp>
+#include <Nova/graphics/opengl/GL.hpp>
+#include <Nova/graphics/opengl/BufferRegion.hpp>
+#include <utility>
 #include <span>
-#include <vector>
-#include <array>
-#include <type_traits>
 
 namespace Nova
 {
-	enum class BindingTarget
-	{
-		ArrayBuffer = GL_ARRAY_BUFFER,
-		ElementArrayBuffer = GL_ELEMENT_ARRAY_BUFFER,
-		CopyReadBuffer = GL_COPY_READ_BUFFER,
-		CopyWriteBuffer = GL_COPY_WRITE_BUFFER,
-		PixelUnpackBuffer = GL_PIXEL_UNPACK_BUFFER,
-		PixelPackBuffer = GL_PIXEL_PACK_BUFFER,
-		QueryBuffer = GL_QUERY_BUFFER,
-		TextureBuffer = GL_TEXTURE_BUFFER,
-		TransformFeedbackBuffer = GL_TRANSFORM_FEEDBACK_BUFFER,
-		UniformBuffer = GL_UNIFORM_BUFFER,
-		DrawIndirectBuffer = GL_DRAW_INDIRECT_BUFFER,
-		AtomicCounterBuffer = GL_ATOMIC_COUNTER_BUFFER,
-		DispatchIndirectBuffer = GL_DISPATCH_INDIRECT_BUFFER,
-		ShaderStorageBuffer = GL_SHADER_STORAGE_BUFFER,
-	};
+    enum class BufferAccessFlags : GLenum
+    {
+        None = 0,
+        Readable = GL_MAP_READ_BIT,
+        Writable = GL_MAP_WRITE_BIT,
+    };
 
-	enum BufferFlags
-	{
-		None = 0,
-		DynamicStorage = GL_DYNAMIC_STORAGE_BIT,
-		Persistent = GL_MAP_PERSISTENT_BIT,
-		Coherent = GL_MAP_COHERENT_BIT,
-		ClientStorage = GL_CLIENT_STORAGE_BIT,
-		Read = GL_MAP_READ_BIT,
-		Write = GL_MAP_WRITE_BIT,
-		ReadWrite = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT,
-	};
+    NV_DEFINE_BITWISE_OPERATORS(BufferAccessFlags);
 
-	class Buffer
-	{
-	public:
-		Buffer() = default;
-		Buffer(
-			GLsizeiptr size,
-			bool isWritable = false,
-			bool isReadable = false,
-			const void *data = nullptr);
+    class Buffer
+    {
+    public:
+        Buffer() = default;
 
-		void Delete() noexcept;
+        Buffer(const Buffer &other);
 
-		template <typename T = void>
-		constexpr BufferView<T> GetView(GLsizeiptr size = (GLsizeiptr)-1, GLintptr offset = 0)
-		{
-			return BufferView<T>(id_, baseDataPtr_, size, offset);
-		}
+        constexpr Buffer(Buffer &&other) noexcept
+            : id_(std::exchange(other.id_, 0)),
+              dataBase_(other.dataBase_),
+              dataCurrent_(other.dataCurrent_),
+              size_(other.size_) {}
 
-		constexpr void *GetDataPtr() noexcept { return dataPtr_; }
+        Buffer(GLsizeiptr size, BufferAccessFlags accessFlags, const void *data = nullptr);
 
-		constexpr const void *GetDataPtr() const noexcept { return dataPtr_; }
+        ~Buffer() noexcept;
 
-		template <typename T>
-		constexpr T *GetDataPtr() noexcept { return reinterpret_cast<T *>(dataPtr_); }
+        GLsizeiptr Commit(bool wholeBuffer = false) noexcept;
 
-		template <typename T>
-		constexpr const T *GetDataPtr() noexcept { return reinterpret_cast<const T *>(dataPtr_); }
+        void Commit(GLintptr offset, GLsizeiptr length) noexcept;
 
-		void Store(const void *data, std::size_t sizeBytes) noexcept;
+        void Discard() noexcept;
 
-		void Reset() { dataPtr_ = baseDataPtr_; }
+        void Write(const void *data, GLsizeiptr dataSize) noexcept;
 
-		template <typename T>
-		void Store(std::span<T> data)
-		{
-			Store(data.data(), data.size_bytes());
-		}
+        template <typename T>
+        void Write(const std::span<T> data) noexcept
+        {
+            Write(data.data(), data.size_bytes());
+        }
 
-		template <
-			glm::length_t C,
-			glm::length_t R,
-			typename T,
-			glm::qualifier Q = glm::qualifier::defaultp>
-		void Store(const glm::mat<C, R, T, Q> &matrix)
-		{
-			Store(glm::value_ptr(matrix), sizeof(matrix));
-		}
+        template <typename T>
+        constexpr BufferRegion<T> GetRegion(GLintptr offsetBytes = 0, GLsizei size = sizeof(T)) noexcept
+        {
+            return BufferRegion<T>(
+                *this,
+                offsetBytes,
+                size,
+                reinterpret_cast<T *>(static_cast<std::byte *>(dataBase_) + offsetBytes));
+        }
 
-		template <
-			glm::length_t L,
-			typename T,
-			glm::qualifier Q = glm::qualifier::defaultp>
-		void Store(const glm::vec<L, T, Q> &vector)
-		{
-			Store(glm::value_ptr(vector), sizeof(vector));
-		}
+        void Bind(BufferBindTarget target) const noexcept;
 
-		template <
-			typename T,
-			glm::qualifier Q = glm::qualifier::defaultp>
-		void Store(const glm::qua<T, Q> &quaternion)
-		{
-			Store(glm::value_ptr(quaternion), sizeof(quaternion));
-		}
+        void Bind(BufferBaseTarget target, GLuint index) const noexcept;
 
-		void Commit() noexcept;
+        void Bind(BufferBaseTarget target, GLuint index, GLintptr offset, GLsizeiptr size) const noexcept;
 
-		void Commit(GLsizeiptr sizeBytes, GLsizeiptr offset) noexcept;
+        void SetDebugName(const std::string_view debugName) const;
 
-		void Bind(BindingTarget target) const;
+        constexpr GLuint GetID() const noexcept { return id_; }
 
-		void Bind(BindingTarget target, GLuint index) const;
+        constexpr GLsizeiptr GetSize() const noexcept { return size_; }
 
-		void Bind(BindingTarget target, GLuint index, GLintptr offset, GLsizeiptr size) const;
+        constexpr GLsizeiptr GetDataSize() const noexcept { return (uint8_t *)dataCurrent_ - (uint8_t *)dataBase_; }
 
-		void AdvanceDataPtr(GLsizeiptr nBytes) noexcept;
+        constexpr void *GetDataPtr() noexcept { return dataCurrent_; }
 
-		constexpr GLsizeiptr GetDataSize() const noexcept { return (std::uint8_t *)dataPtr_ - (std::uint8_t *)baseDataPtr_; }
+        constexpr const void *GetDataPtr() const noexcept { return dataCurrent_; }
 
-		constexpr GLsizeiptr GetSize() const noexcept { return size_; }
+        template <typename T>
+        constexpr T *GetDataPtr() noexcept { return reinterpret_cast<T *>(dataCurrent_); }
 
-		constexpr GLuint GetID() const noexcept { return id_; }
+        template <typename T>
+        constexpr const T *GetDataPtr() const noexcept { return reinterpret_cast<const T *>(dataCurrent_); }
 
-		constexpr bool IsReadable() const noexcept { return isReadable_; }
+        constexpr void *GetBasePtr(GLsizeiptr offsetBytes = 0) noexcept { return (uint8_t *)dataBase_ + offsetBytes; }
 
-		constexpr bool IsWritable() const noexcept { return isWritable_; }
+        constexpr const void *GetBasePtr(GLsizeiptr offsetBytes = 0) const noexcept { return (const uint8_t *)dataBase_ + offsetBytes; }
 
-	private:
-		void *baseDataPtr_ = nullptr;
-		void *dataPtr_ = nullptr;
-		GLsizeiptr size_;
-		GLuint id_;
-		bool isReadable_;
-		bool isWritable_;
-	};
+        template <typename T>
+        constexpr T *GetBasePtr(GLsizeiptr offsetCount = 0) noexcept { return static_cast<T *>(dataBase_) + offsetCount; }
+
+        template <typename T>
+        constexpr const T *GetBasePtr(GLsizeiptr offsetCount = 0) const noexcept { return static_cast<T *>(dataBase_) + offsetCount; }
+
+        Buffer &operator=(const Buffer &other) = delete;
+
+        constexpr Buffer &operator=(Buffer &&other) noexcept
+        {
+            id_ = std::exchange(other.id_, 0);
+            size_ = other.size_;
+            dataBase_ = other.dataBase_;
+            dataCurrent_ = other.dataCurrent_;
+
+            return *this;
+        }
+
+    private:
+        GLsizeiptr size_;
+        void *dataBase_ = nullptr;
+        void *dataCurrent_ = nullptr;
+        GLuint id_ = 0;
+    };
 }
