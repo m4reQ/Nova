@@ -38,6 +38,10 @@ if(WIN32)
         PUBLIC
         "NV_WINDOWS")
 endif()
+if(MSVC)
+    target_compile_definitions(Nova PRIVATE "_CRT_SECURE_NO_WARNINGS")
+    target_compile_options(Nova PRIVATE "/W4" "/WX")
+endif()
 set_target_properties(
     Nova
     PROPERTIES
