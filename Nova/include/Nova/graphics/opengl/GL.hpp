@@ -1,5 +1,6 @@
 #pragma once
 #include <Nova/core/Flag.hpp>
+#include <Nova/core/Utility.hpp>
 #include <glad/gl.h>
 #include <glm/vec4.hpp>
 #include <string>
@@ -1161,8 +1162,8 @@ namespace Nova
             glDeleteRenderbuffers(1, &renderbuffer);
         }
 
-        /// @brief FIX Undocumented
-        /// @param texture
+        /// @brief Delete named texture.
+        /// @param texture Specifies the texture to be deleted.
         inline void DeleteTexture(GLuint texture) noexcept
         {
             glDeleteTextures(1, &texture);
@@ -1218,6 +1219,7 @@ namespace Nova
         /// @param label The string containing the label to assign to the object.
         inline void ObjectLabel(ObjectIdentifier identifier, GLuint name, const std::string_view label) noexcept
         {
+            assert_fits_in<GLsizei>(label.size());
             glObjectLabel(static_cast<GLenum>(identifier), name, static_cast<GLsizei>(label.length()), label.data());
         }
 
@@ -1226,6 +1228,7 @@ namespace Nova
         /// @param label The string containing the label to assign to the object.
         inline void ObjectLabel(GLsync ptr, const std::string_view label) noexcept
         {
+            assert_fits_in<GLsizei>(label.size());
             glObjectPtrLabel(ptr, static_cast<GLsizei>(label.length()), label.data());
         }
 
@@ -1248,13 +1251,20 @@ namespace Nova
         {
             glScissor(x, y, width, height);
         }
+
+        /// @brief Delete named buffer object.
+        /// @param buffer Specifies the buffer object to be deleted.
+        inline void DeleteBuffer(GLuint buffer) noexcept
+        {
+            glDeleteBuffers(1, &buffer);
+        }
     }
 
     template <std::integral T>
     constexpr Attachment operator+(Attachment a, T b) noexcept
     {
         using t = std::underlying_type_t<Attachment>;
-        return (Attachment)((t)(a) + (t)(b));
+        return static_cast<Attachment>(static_cast<t>(a) + static_cast<t>(b));
     }
 
     NV_DEFINE_BITWISE_OPERATORS(ClearMask);
