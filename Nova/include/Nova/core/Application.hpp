@@ -45,6 +45,10 @@ namespace Nova
 
         constexpr InputSystem &GetInputSystem() noexcept { return inputSystem_; }
 
+        constexpr Renderer &GetRenderer() noexcept { return renderer_; }
+
+        constexpr const Renderer &GetRenderer() const noexcept { return renderer_; }
+
         constexpr const std::string_view GetName() const noexcept { return name_; }
 
         constexpr double GetFrametime() const noexcept { return frametime_; }
@@ -64,6 +68,6 @@ namespace Nova
         Renderer renderer_;
         std::string name_;
         std::chrono::high_resolution_clock::time_point appStart_;
-        double frametime_ = 1.0;
+        double frametime_ = 0.001;
     };
 }
