@@ -1,4 +1,5 @@
 #include <Nova/platform/windows/WGLContext.hpp>
+#include <Nova/debug/Profile.hpp>
 #include <glad/wgl.h>
 #include <stdexcept>
 
@@ -32,12 +33,16 @@ Nova::WGLContext::WGLContext(HDC deviceContext, std::span<const int> attribs)
 
 void Nova::WGLContext::MakeCurrent(HDC deviceContext) const
 {
+    NV_PROFILE_FUNC;
+
     if (!wglMakeCurrent(deviceContext, context_.Get()))
         throw std::runtime_error("Failed to make WGL context current.");
 }
 
 void Nova::WGLContext::LoadModern(HDC deviceContext) const
 {
+    NV_PROFILE_FUNC;
+
     if (!gladLoadWGL(deviceContext, reinterpret_cast<GLADloadfunc>(wglGetProcAddress)))
         throw std::runtime_error("Failed to load modern WGL function pointers.");
 }
