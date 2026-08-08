@@ -11,3 +11,4 @@
 #include <Nova/events/WindowMoveEvent.hpp>
 #include <Nova/events/WindowResizeEvent.hpp>
 #include <Nova/events/EventSystem.hpp>
+#include <Nova/events/PlatformEvent.hpp>

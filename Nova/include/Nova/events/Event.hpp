@@ -16,6 +16,7 @@ namespace Nova
         KeyDown,
         KeyUp,
         FileDrop,
+        PlatformEvent,
     };
 
     class Event
