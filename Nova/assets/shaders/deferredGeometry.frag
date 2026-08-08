@@ -5,17 +5,19 @@ struct Material
 {
 	vec4 color;
 	float specularIntensity;
+	float shininess;
+	uvec2 albedoTextureHandle;
 };
 
 in flat uint vsMaterialIndex;
-in flat uvec2 vsBindlessTextureHandle;
 in vec3 vsPosition;
 in vec3 vsNormal;
 in vec2 vsTexCoord;
 
-layout(location=0) out vec4 outColor;
-layout(location=1) out vec3 outPosition;
-layout(location=2) out vec3 outNormal;
+out vec4 outColor;
+out vec3 outPosition;
+out vec3 outNormal;
+out vec3 outShininess;
 
 layout(std430, binding = 1) buffer sMaterialData
 {
@@ -26,7 +28,8 @@ void main()
 {
 	Material material = materialData[vsMaterialIndex];
 
-	outColor = texture(sampler2D(vsBindlessTextureHandle), vsTexCoord) * vec4(material.color.rgb, material.specularIntensity);
+	outColor = texture(sampler2D(material.albedoTextureHandle), vsTexCoord) * vec4(material.color.rgb, material.specularIntensity);
 	outPosition = vsPosition;
 	outNormal = normalize(vsNormal);
+	outShininess = vec3(material.shininess, 0.0, 0.0);
 }

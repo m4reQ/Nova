@@ -3,7 +3,7 @@
 
 in vec2 vsTexCoord;
 
-layout(location = 4) out vec4 outColor;
+out vec4 outColor;
 
 layout(bindless_sampler) uniform sampler2D uSceneColor;
 layout(bindless_sampler) uniform sampler2D uDepth;

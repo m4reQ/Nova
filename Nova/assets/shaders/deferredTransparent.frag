@@ -5,6 +5,8 @@ struct Material
 {
 	vec4 color;
 	float specularIntensity;
+    float shininess;
+    uvec2 albedoTextureHandle;
 };
 
 struct PointLight
@@ -21,15 +23,13 @@ struct DirLight
 };
 
 in flat uint vsMaterialIndex;
-in flat uvec2 vsBindlessTextureHandle;
 in vec3 vsPosition;
 in vec3 vsNormal;
 in vec2 vsTexCoord;
 
-layout(location=3) out vec4 outColor;
+out vec4 outColor;
 
 uniform float uAmbient;
-uniform float uShininess;
 uniform uint uPointLightsCount;
 uniform uint uDirLightsCount;
 
@@ -61,7 +61,7 @@ void main()
 {
 	Material material = materialData[vsMaterialIndex];
 
-    vec4 textureColor = texture(sampler2D(vsBindlessTextureHandle), vsTexCoord);
+    vec4 textureColor = texture(sampler2D(material.albedoTextureHandle), vsTexCoord);
     vec3 baseColor = textureColor.rgb * material.color.rgb;
     float baseAlpha = textureColor.a * material.color.a;
 
@@ -83,7 +83,7 @@ void main()
         vec3 diffuse = nDotL * baseColor * light.color.rgb * light.color.a;
 
         // specular
-        vec3 specular = pow(max(dot(normal, h), 0.0), uShininess) *
+        vec3 specular = pow(max(dot(normal, h), 0.0), material.shininess) *
             material.specularIntensity * 
             light.color.rgb *
             light.color.a;
@@ -115,7 +115,7 @@ void main()
 
             // specular
             vec3 specular = 
-                pow(max(dot(normal, h), 0.0), uShininess) *
+                pow(max(dot(normal, h), 0.0), material.shininess) *
                 material.specularIntensity *
                 light.color.rgb *
                 light.color.a;
