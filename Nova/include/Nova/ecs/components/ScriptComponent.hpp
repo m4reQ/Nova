@@ -3,16 +3,19 @@
 #include <memory>
 #include <type_traits>
 
-struct CPPScriptComponent
+namespace Nova
 {
-    std::unique_ptr<ScriptController> ControllerInstance;
-
-    template <typename T, typename... Args>
-    requires std::is_base_of_v<ScriptController, T>
-    static CPPScriptComponent Create(Args&&... args)
+    struct CPPScriptComponent
     {
-        return CPPScriptComponent { 
-            .ControllerInstance = std::make_unique<T>(std::forward<Args>(args)...),
-        };
-    }
-};
+        std::unique_ptr<ScriptController> ControllerInstance;
+
+        template <typename T, typename... Args>
+            requires std::is_base_of_v<ScriptController, T>
+        static CPPScriptComponent Create(Args &&...args)
+        {
+            return CPPScriptComponent{
+                .ControllerInstance = std::make_unique<T>(std::forward<Args>(args)...),
+            };
+        }
+    };
+}
