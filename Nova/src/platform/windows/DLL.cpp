@@ -7,7 +7,7 @@ HMODULE Nova::DLL::GetHandle() noexcept
     return sModule;
 }
 
-BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID reserved)
+BOOL APIENTRY DllMain(HMODULE module, DWORD, LPVOID)
 {
     sModule = module;
 
