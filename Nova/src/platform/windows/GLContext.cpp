@@ -1,14 +1,27 @@
 #include <Nova/graphics/opengl/Context.hpp>
 #include <Nova/platform/windows/DeviceContext.hpp>
 #include <Nova/platform/windows/WGLContext.hpp>
+#include <Nova/platform/windows/Error.hpp>
+#include <Nova/debug/Profile.hpp>
+#include <glad/wgl.h>
 #include <stdexcept>
 #include <array>
 
-#ifdef NV_DEBUG
-constexpr auto cContextFlags = WGL_CONTEXT_DEBUG_BIT_ARB | WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
-#else
-constexpr auto cContextFlags = WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
-#endif
+static GLADapiproc LoadGLFunction(const char *funcName)
+{
+    auto func = static_cast<void *>(wglGetProcAddress(funcName));
+    if (func == nullptr ||
+        func == reinterpret_cast<void *>(0x1) ||
+        func == reinterpret_cast<void *>(0x2) ||
+        func == reinterpret_cast<void *>(0x3) ||
+        func == reinterpret_cast<void *>(-1))
+    {
+        static auto glLib = LoadLibraryA("opengl32.dll");
+        func = static_cast<void *>(GetProcAddress(glLib, funcName));
+    }
+
+    return static_cast<GLADapiproc>(func);
+}
 
 static void SelectPixelFormat(HDC deviceContext, std::span<const int> formatAttributes)
 {
@@ -21,34 +34,35 @@ static void SelectPixelFormat(HDC deviceContext, std::span<const int> formatAttr
         1,
         &formatIndex,
         &foundFormatsCount);
-    if (!formatFound)
+    if (!formatFound || foundFormatsCount == 0)
         throw std::runtime_error("Failed to find suitable pixel format.");
 
-    SetPixelFormat(deviceContext, formatIndex, nullptr);
+    PIXELFORMATDESCRIPTOR desc{
+        .nSize = sizeof(desc),
+    };
+    if (!DescribePixelFormat(deviceContext, formatIndex, sizeof(PIXELFORMATDESCRIPTOR), &desc))
+        throw Nova::Win32::Exception("Failed to describe OpenGL pixel format.");
+
+    if (!SetPixelFormat(deviceContext, formatIndex, nullptr))
+        throw Nova::Win32::Exception("Failed to set pixel format.");
 }
 
-Nova::GLContext::GLContext(const WindowData &windowData, unsigned int versionMajor, unsigned int versionMinor)
+static void LoadModernWGL(HINSTANCE hInstance)
 {
+    NV_PROFILE_FUNC;
+
     // Create dummy window
-    constexpr auto wndClassName = "NovaDummyWindow";
-    Nova::WindowClass wndClass(
-        WNDCLASSEXA{
-            .cbSize = sizeof(WNDCLASSEXA),
-            .style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC,
-            .lpfnWndProc = DefWindowProcA,
-            .hInstance = windowData.instance,
-            .lpszClassName = wndClassName,
-        });
     Nova::WindowHandle windowHandle(
         0,
-        wndClass,
+        "STATIC",
         "",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         500,
         500,
-        windowData.instance);
+        hInstance,
+        nullptr);
     Nova::DeviceContext dc(windowHandle);
 
     const PIXELFORMATDESCRIPTOR pfd{
@@ -73,9 +87,16 @@ Nova::GLContext::GLContext(const WindowData &windowData, unsigned int versionMaj
     Nova::WGLContext legacyContext(dc);
     legacyContext.MakeCurrent(dc);
     legacyContext.LoadModern(dc);
+}
+
+Nova::GLContext::GLContext(const WindowData &windowData, unsigned int versionMajor, unsigned int versionMinor)
+{
+    NV_PROFILE_FUNC;
+
+    LoadModernWGL(windowData.instance);
 
     // Create modern context
-    data_.deviceContext = windowData.deviceContext.Get();
+    data_.deviceContext = windowData.deviceContext;
 
     const auto formatAttribs = std::array<int, 17>({
         WGL_DRAW_TO_WINDOW_ARB,
@@ -98,13 +119,19 @@ Nova::GLContext::GLContext(const WindowData &windowData, unsigned int versionMaj
     });
     SelectPixelFormat(data_.deviceContext, formatAttribs);
 
+#ifdef NV_DEBUG
+    constexpr auto contextFlags = WGL_CONTEXT_DEBUG_BIT_ARB | WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
+#else
+    constexpr auto contextFlags = WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB;
+#endif
+
     const auto contextAttribs = std::array<int, 9>({
         WGL_CONTEXT_MAJOR_VERSION_ARB,
         static_cast<int>(versionMajor),
         WGL_CONTEXT_MINOR_VERSION_ARB,
         static_cast<int>(versionMinor),
         WGL_CONTEXT_FLAGS_ARB,
-        cContextFlags,
+        contextFlags,
         WGL_CONTEXT_PROFILE_MASK_ARB,
         WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
         0,
@@ -114,6 +141,8 @@ Nova::GLContext::GLContext(const WindowData &windowData, unsigned int versionMaj
         data_.deviceContext,
         nullptr,
         contextAttribs.data());
+    if (data_.context == nullptr)
+        throw Win32::Exception("Failed to create WGL context.");
 }
 
 Nova::GLContext::~GLContext() noexcept
@@ -127,14 +156,18 @@ Nova::GLContext::~GLContext() noexcept
 
 void Nova::GLContext::MakeCurrent()
 {
+    NV_PROFILE_FUNC;
+
     if (!wglMakeCurrent(data_.deviceContext, data_.context))
-        throw std::runtime_error("Failed to make WGL context current.");
+        throw Win32::Exception("Failed to make WGL context current");
 }
 
 void Nova::GLContext::LoadGL()
 {
-    if (!gladLoadGL(reinterpret_cast<GLADloadfunc>(wglGetProcAddress)))
-        throw std::runtime_error("Failed to load OpenGL function pointers.");
+    NV_PROFILE_FUNC;
+
+    if (!gladLoadGL(LoadGLFunction))
+        throw Win32::Exception("Failed to load OpenGL function pointers");
 }
 
 double Nova::GLContext::GetRefreshRate()
