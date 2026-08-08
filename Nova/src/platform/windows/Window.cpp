@@ -9,8 +9,6 @@
 #include <Windowsx.h>
 #include <shellapi.h>
 
-constexpr auto cWindowClassName = "NovaWindow";
-
 static void SendSetIcon(HWND window, const Nova::Icon &icon) noexcept
 {
     SendMessage(
@@ -23,67 +21,6 @@ static void SendSetIcon(HWND window, const Nova::Icon &icon) noexcept
         WM_SETICON,
         ICON_SMALL,
         reinterpret_cast<LPARAM>(icon.Get()));
-}
-
-static void SetIcon(HWND window, HICON icon) noexcept
-{
-    NV_PROFILE_FUNC;
-
-    auto oldIconBig = reinterpret_cast<HICON>(
-        SendMessage(
-            window,
-            WM_SETICON,
-            ICON_BIG,
-            reinterpret_cast<LPARAM>(icon)));
-    auto oldIconSmall = reinterpret_cast<HICON>(
-        SendMessage(
-            window,
-            WM_SETICON,
-            ICON_SMALL,
-            reinterpret_cast<LPARAM>(icon)));
-
-    if (oldIconBig)
-        DestroyIcon(oldIconBig);
-
-    if (oldIconSmall && oldIconSmall != oldIconBig)
-        DestroyIcon(oldIconSmall);
-}
-
-static void SetCustomCursor(HCURSOR cursor) noexcept
-{
-    NV_PROFILE_FUNC;
-
-    auto oldCursor = SetCursor(cursor);
-    if (oldCursor)
-        DestroyCursor(oldCursor);
-}
-
-static HANDLE LoadImageFromFile(const std::filesystem::path &path, UINT imageType, HINSTANCE instance)
-{
-    NV_PROFILE_FUNC;
-
-    HANDLE image{};
-    if constexpr (std::is_same_v<std::filesystem::path::value_type, char>)
-        image = LoadImageA(
-            instance,
-            reinterpret_cast<const char *>(path.c_str()),
-            imageType,
-            0,
-            0,
-            LR_LOADFROMFILE | LR_DEFAULTSIZE);
-    else
-        image = LoadImageW(
-            instance,
-            reinterpret_cast<const wchar_t *>(path.c_str()),
-            imageType,
-            0,
-            0,
-            LR_LOADFROMFILE | LR_DEFAULTSIZE);
-
-    if (!image)
-        throw std::runtime_error("Failed to load image file.");
-
-    return image;
 }
 
 static constexpr DWORD GetStyleEx(Nova::WindowFlags flags) noexcept
@@ -261,12 +198,30 @@ LRESULT CALLBACK Nova::Window::WindowProc(HWND win, UINT msg, WPARAM wParam, LPA
 {
     NV_PROFILE_FUNC;
 
-    auto *window = reinterpret_cast<Window *>(GetWindowLongPtrA(win, 0));
-    return window->HandleMessage(win, msg, wParam, lParam);
+    if (msg == WM_CREATE)
+    {
+        const auto createStruct = reinterpret_cast<CREATESTRUCTA *>(lParam);
+        SetWindowLongPtrA(
+            win,
+            GWLP_USERDATA,
+            reinterpret_cast<LONG_PTR>(createStruct->lpCreateParams));
+        return FALSE;
+    }
+
+    auto *window = reinterpret_cast<Window *>(GetWindowLongPtrA(win, GWLP_USERDATA));
+    if (window == nullptr)
+    {
+        NV_LOG_WARNING("Window pointer is NULL while processing message {}. Default window proc will be called.", msg);
+        return DefWindowProcA(win, msg, wParam, lParam);
+    }
+    else
+        return window->HandleMessage(win, msg, wParam, lParam);
 }
 
 LRESULT Nova::Window::HandleMessage(HWND win, UINT msg, WPARAM wParam, LPARAM lParam) noexcept
 {
+    eventSystem_.InvokeEvent<PlatformEvent>(win, msg, wParam, lParam);
+
     switch (msg)
     {
     case WM_DESTROY:
@@ -397,7 +352,7 @@ LRESULT Nova::Window::HandleMessage(HWND win, UINT msg, WPARAM wParam, LPARAM lP
         for (UINT i = 0; i < pathsCount; i++)
         {
             std::array<wchar_t, MAX_PATH> pathBuf;
-            const auto pathLength = DragQueryFileW(drop, i, pathBuf.data(), pathBuf.size());
+            const auto pathLength = DragQueryFileW(drop, i, pathBuf.data(), MAX_PATH);
 
             paths.emplace_back(pathBuf.begin(), pathBuf.begin() + pathLength);
         }
@@ -421,6 +376,14 @@ Nova::Window::Window(
 {
     NV_PROFILE_FUNC;
 
+    constexpr auto windowClassName = "NovaWindow";
+
+    const auto style = GetStyle(settings.Flags);
+    const auto styleEx = GetStyleEx(settings.Flags);
+
+    RECT windowRect{0, 0, settings.Width, settings.Height};
+    AdjustWindowRectEx(&windowRect, style, FALSE, styleEx);
+
     data_.instance = startupData.exeInstance;
     data_.wndClass = WindowClass(
         WNDCLASSEXA{
@@ -428,21 +391,23 @@ Nova::Window::Window(
             .style = CS_VREDRAW | CS_HREDRAW | CS_OWNDC | CS_DBLCLKS,
             .lpfnWndProc = WindowProc,
             .cbWndExtra = sizeof(WindowData),
-            .lpszClassName = cWindowClassName,
+            .hInstance = startupData.exeInstance,
+            .hbrBackground = CreateSolidBrush(RGB(0, 0, 0)),
+            .lpszClassName = windowClassName,
         });
     data_.handle = WindowHandle(
-        GetStyleEx(settings.Flags),
-        data_.wndClass,
+        styleEx,
+        windowClassName,
         settings.Title,
-        GetStyle(settings.Flags),
+        style,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        settings.Width,
-        settings.Height,
-        startupData.exeInstance);
+        windowRect.right - windowRect.left,
+        windowRect.bottom - windowRect.top,
+        startupData.exeInstance,
+        this);
     data_.deviceContext = DeviceContext(data_.handle);
 
-    SetWindowLongPtrA(data_.handle, 0, reinterpret_cast<LONG_PTR>(this));
     ShowWindow(data_.handle, startupData.showCommand);
 }
 

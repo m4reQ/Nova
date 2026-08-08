@@ -131,9 +131,9 @@ namespace Nova
         Window &operator=(Window &&) noexcept = default;
 
     private:
-        WindowData data_;
         EventSystem &eventSystem_;
         InputSystem &inputSystem_;
+        WindowData data_;
 
         static LRESULT CALLBACK WindowProc(HWND win, UINT msg, WPARAM wParam, LPARAM lParam) noexcept;
 
