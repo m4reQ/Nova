@@ -5,20 +5,20 @@
 
 namespace Nova
 {
-    constexpr size_t SyncHandlesCount = 3;
-    constexpr size_t SyncTimeoutInfinite = -1;
-    constexpr size_t SyncTimeoutImmediate = 0;
-    constexpr size_t SyncInfiniteTimeoutThresholdNs = 1000;
+    constexpr auto SyncHandlesCount = 3zu;
+    constexpr auto SyncTimeoutInfinite = static_cast<size_t>(-1);
+    constexpr auto SyncTimeoutImmediate = 0zu;
+    constexpr auto SyncInfiniteTimeoutThresholdNs = 1000zu;
 
     class Sync
     {
     public:
         Sync() = default;
 
-        constexpr Sync(const Sync&) = delete;
+        constexpr Sync(const Sync &) = delete;
 
-        constexpr Sync(Sync&& other) noexcept
-            : syncHandles_(std::exchange(other.syncHandles_, {0})) { }
+        constexpr Sync(Sync &&other) noexcept
+            : syncHandles_(std::exchange(other.syncHandles_, {0})) {}
 
         ~Sync() noexcept;
 
@@ -32,7 +32,7 @@ namespace Nova
 
         constexpr GLsync Get() const noexcept { return syncHandles_[currentSyncIndex_]; }
 
-        constexpr Sync& operator=(Sync&& other) noexcept
+        constexpr Sync &operator=(Sync &&other) noexcept
         {
             syncHandles_ = std::exchange(other.syncHandles_, {0});
             return *this;
