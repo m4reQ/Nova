@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.26)
 
 project(Nova LANGUAGES CXX C)
 
@@ -41,6 +41,9 @@ add_subdirectory(vendor/json)
 set(SPDLOG_BUILD_EXAMPLE OFF)
 set(SPDLOG_BUILD_TESTS OFF)
 set(SPDLOG_BUILD_BENCH OFF)
+set(SPDLOG_BUILD_SHARED OFF)
+set(SPDLOG_BUILD_ALL OFF)
+set(SPDLOG_ENABLE_PCH ON)
 set(SPDLOG_USE_STD_FORMAT ON)
 set(SPDLOG_INSTALL OFF)
 add_subdirectory(vendor/spdlog)
@@ -70,3 +73,4 @@ add_subdirectory(EditorScript)
 add_subdirectory(NovaEditor)
 
 set(CMAKE_VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:NovaEditor>)
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT NovaEditor)
