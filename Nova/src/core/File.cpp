@@ -31,10 +31,26 @@ static std::vector<T> ReadFileToEnd(FILE *file) noexcept
 	return buffer;
 }
 
+void File::WriteBinary(const std::filesystem::path &filepath, std::span<const std::byte> binary)
+{
+	NV_PROFILE_FUNC;
+
+	FILE *file = fopen(filepath.string().c_str(), "wb+");
+	if (file == nullptr)
+		throw std::runtime_error("Failed to open file.");
+
+	const auto bytesWritten = fwrite(binary.data(), sizeof(std::byte), binary.size(), file);
+	if (bytesWritten != binary.size_bytes())
+		throw std::runtime_error("Failed to write binary to a file.");
+
+	fclose(file);
+}
+
 std::vector<char> File::ReadWholeText(const std::filesystem::path &filepath)
 {
 	NV_PROFILE_FUNC;
 
+	// TODO RAII wrapper for FILE*
 	FILE *file = fopen(filepath.string().c_str(), "r");
 	if (file == nullptr)
 		throw std::runtime_error("Failed to open file.");

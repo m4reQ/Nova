@@ -21,6 +21,8 @@ namespace Nova
 
 		static std::vector<std::byte> ReadWholeBinary(const std::filesystem::path &filepath);
 
+		static void WriteBinary(const std::filesystem::path &filepath, std::span<const std::byte> binary);
+
 		File() noexcept = default;
 
 		constexpr File(File &&other) noexcept
