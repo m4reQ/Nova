@@ -7,6 +7,7 @@
 #include <Nova/graphics/opengl/Framebuffer.hpp>
 #include <Nova/graphics/opengl/Context.hpp>
 #include <Nova/graphics/opengl/Texture.hpp>
+#include <Nova/graphics/opengl/ShaderCache.hpp>
 #include <Nova/graphics/Window.hpp>
 #include <Nova/graphics/Rect.hpp>
 #include <Nova/graphics/Material.hpp>
@@ -168,6 +169,7 @@ namespace Nova
         BindlessTextureBinder textureBinder_;
         Texture whiteTexture_;
         GLuint64 whiteTextureHandle_;
+        ShaderCache shaderCache_;
         ShaderProgram deferredGeometryProgram_;
         ShaderProgram deferredLightProgram_;
         ShaderProgram deferredTransparentProgram_;

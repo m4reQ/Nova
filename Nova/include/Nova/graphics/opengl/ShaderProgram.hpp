@@ -1,5 +1,5 @@
 #pragma once
-#include <Nova/graphics/opengl/ShaderStage.hpp>
+#include <Nova/graphics/opengl/ID.hpp>
 #include <Nova/core/Utility.hpp>
 #include <glm/glm.hpp>
 #include <span>
@@ -11,9 +11,20 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
+#include <variant>
 
 namespace Nova
 {
+	enum class ShaderType
+	{
+		Vertex = GL_VERTEX_SHADER,
+		Fragment = GL_FRAGMENT_SHADER,
+		Compute = GL_COMPUTE_SHADER,
+		TesselationControl = GL_TESS_CONTROL_SHADER,
+		TesselationEvaluation = GL_TESS_EVALUATION_SHADER,
+		Geometry = GL_GEOMETRY_SHADER,
+	};
+
 	struct ProgramBinary
 	{
 		std::unique_ptr<std::byte[]> Binary;
@@ -21,30 +32,108 @@ namespace Nova
 		GLenum Format;
 	};
 
-	/// @brief Used for configuring shader output variables. Equivalent of GLSLs `layout(location=Location) out ... Name`.
+	enum class DependencyType
+	{
+		Source = 1,
+		BinaryStage = 2,
+		BinaryProgram = 3,
+	};
+
+	/// @brief Specifies a dependency of specific shader stage with source code.
+	struct SourceDependency
+	{
+		ShaderType ShaderType;
+	};
+
+	/// @brief Specifies a dependency of specific shader stage with binary.
+	struct BinaryStageDependency
+	{
+		ShaderType ShaderType;
+		GLenum BinaryFormat;
+	};
+
+	/// @brief Specifies a depenedncy of whole shader program with this program's binary
+	struct BinaryProgramDependency
+	{
+		GLenum BinaryFormat;
+	};
+
+	/// @brief Specifies information about shader program creation dependency
+	struct ProgramDependency
+	{
+		std::filesystem::file_time_type Timestamp;
+		std::filesystem::path Filepath;
+		uintmax_t FileSize;
+		std::variant<SourceDependency, BinaryStageDependency, BinaryProgramDependency> Data;
+	};
+
+	struct ShaderSpecializeInfo
+	{
+		std::string_view EntryPoint;
+		std::span<const GLuint> ConstantIndices;
+		std::span<const GLuint> ConstantValues;
+	};
+
+	/// @brief Used for configuring shader output variables.
+	/// Equivalent of GLSLs `layout(location=<Location>) out ... <Name>`.
 	struct OutputLocation
 	{
 		std::string Name;
 		GLuint Location;
 	};
 
+	struct SourceShaderStage
+	{
+		ShaderType Type;
+		std::string_view Source;
+	};
+
+	struct BinaryShaderStage
+	{
+		ShaderType Type;
+		GLenum BinaryFormat;
+		std::span<const std::byte> Binary;
+	};
+
+	struct SourceFileShaderStage
+	{
+		ShaderType Type;
+		std::filesystem::path Filepath;
+	};
+
+	struct BinaryFileShaderStage
+	{
+		ShaderType Type;
+		GLenum BinaryFormat;
+		std::filesystem::path Filepath;
+	};
+
+	struct SPIRVShaderStage
+	{
+		ShaderType Type;
+		std::span<const std::byte> Binary;
+		std::optional<ShaderSpecializeInfo> SpecializeInfo = std::nullopt;
+	};
+
+	struct SPIRVFileShaderStage
+	{
+		ShaderType Type;
+		std::filesystem::path Filepath;
+		std::optional<ShaderSpecializeInfo> SpecializeInfo = std::nullopt;
+	};
+
+	using ShaderStage = std::variant<
+		SourceShaderStage,
+		BinaryShaderStage,
+		SourceFileShaderStage,
+		BinaryFileShaderStage,
+		SPIRVShaderStage,
+		SPIRVFileShaderStage>;
+
 	class ShaderProgram
 	{
 	public:
 		static void ReleaseShaderCompiler() noexcept;
-
-		static ShaderProgram FromBinary(
-			GLenum binaryFormat,
-			const std::span<std::byte> binary);
-
-		static ShaderProgram FromBinary(
-			GLenum binaryFormat,
-			const std::byte *binary,
-			size_t binarySize);
-
-		static ShaderProgram FromBinary(
-			GLenum binaryFormat,
-			const std::filesystem::path &filepath);
 
 		static bool IsShaderBinarySupported() noexcept;
 
@@ -54,15 +143,17 @@ namespace Nova
 
 		ShaderProgram(const ShaderProgram &) = delete;
 
-		ShaderProgram(ShaderProgram &&other) noexcept;
+		ShaderProgram(ShaderProgram &&) noexcept = default;
 
-		ShaderProgram(std::span<const ShaderStage> stages);
+		ShaderProgram(GLID id);
 
-		ShaderProgram(std::span<const ShaderStage> stages, std::span<const OutputLocation> outputs);
+		ShaderProgram(std::span<const std::byte> binary, GLenum binaryFormat);
 
-		ShaderProgram(std::initializer_list<ShaderStage> stages);
+		ShaderProgram(std::filesystem::path binaryFile, GLenum binaryFormat);
 
-		ShaderProgram(std::initializer_list<ShaderStage> stages, std::initializer_list<OutputLocation> outputs);
+		ShaderProgram(std::span<const ShaderStage> stages, std::span<const OutputLocation> outputs = {});
+
+		ShaderProgram(std::initializer_list<ShaderStage> stages, std::initializer_list<OutputLocation> outputs = {});
 
 		~ShaderProgram() noexcept;
 
@@ -86,27 +177,19 @@ namespace Nova
 
 		GLuint GetResourceLocation(const std::string_view name) const;
 
+		constexpr const std::vector<ProgramDependency> &GetDependencies() const noexcept { return dependencies_; }
+
 		std::optional<GLuint> TryGetResourceLocation(const std::string_view name) const;
 
-		std::pair<const std::span<std::byte>, GLenum> GetBinary();
+		std::pair<std::vector<std::byte>, GLenum> GetBinary() const;
 
-		ShaderProgram &operator=(ShaderProgram &&other) noexcept
-		{
-			resources_ = std::move(other.resources_);
-			savedBinary_ = std::move(other.savedBinary_);
-			id_ = std::exchange(other.id_, 0);
+		ShaderProgram &operator=(const ShaderProgram &) = delete;
 
-			return *this;
-		}
+		ShaderProgram &operator=(ShaderProgram &&) noexcept = default;
 
 	private:
-		std::unordered_map<
-			std::string,
-			GLuint,
-			StringHash,
-			std::equal_to<>>
-			resources_;
-		std::optional<ProgramBinary> savedBinary_ = std::nullopt;
-		GLuint id_ = 0;
+		std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>> resources_;
+		std::vector<ProgramDependency> dependencies_;
+		GLID id_;
 	};
 }

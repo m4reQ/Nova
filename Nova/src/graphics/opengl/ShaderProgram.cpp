@@ -19,29 +19,6 @@ struct ResourceProps
 	static constexpr const std::array<GLenum, 2> Names{GL_LOCATION, GL_NAME_LENGTH};
 };
 
-static ProgramBinary RetrieveProgramBinary(GLuint programID)
-{
-	NV_PROFILE_FUNC;
-
-	GLint binarySize = 0;
-	glGetProgramiv(programID, GL_PROGRAM_BINARY_LENGTH, &binarySize);
-
-	GLenum binaryFormat = 0;
-	auto binary = std::make_unique<std::byte[]>(binarySize);
-	glGetProgramBinary(
-		programID,
-		binarySize,
-		nullptr,
-		&binaryFormat,
-		binary.get());
-
-	return ProgramBinary{
-		.Binary = std::move(binary),
-		.Size = (size_t)binarySize,
-		.Format = binaryFormat,
-	};
-}
-
 static void CheckProgramLinkStatus(GLuint program)
 {
 	GLint linkStatus = GL_FALSE;
@@ -61,6 +38,24 @@ static void CheckProgramLinkStatus(GLuint program)
 	}
 }
 
+static void CheckShaderStatus(GLuint id)
+{
+	GLint compileSuccess = GL_FALSE;
+	glGetShaderiv(id, GL_COMPILE_STATUS, &compileSuccess);
+
+	if (!compileSuccess)
+	{
+		GLint logLength = 0;
+		glGetShaderiv(id, GL_INFO_LOG_LENGTH, &logLength);
+
+		std::string log(logLength, '\0');
+		glGetShaderInfoLog(id, logLength, nullptr, log.data());
+
+		NV_LOG_ERROR("Failed to compile shader stage:\n{}.", log);
+		throw std::runtime_error("Failed to compile shader stage.");
+	}
+}
+
 static void CleanUpAttachedShaders(GLuint program) noexcept
 {
 	NV_PROFILE_FUNC;
@@ -71,7 +66,7 @@ static void CleanUpAttachedShaders(GLuint program) noexcept
 	const auto attachedShaders = std::make_unique<GLuint[]>(stagesCount);
 	glGetAttachedShaders(program, stagesCount, nullptr, attachedShaders.get());
 
-	for (size_t i = 0; i < stagesCount; i++)
+	for (auto i = 0zu; i < stagesCount; i++)
 	{
 		const auto shader = attachedShaders[i];
 		glDetachShader(program, shader);
@@ -98,7 +93,7 @@ static void RetrieveProgramInterface(
 
 	const auto uniformBlocksCount = GL::GetProgramInterface(
 		program,
-		(ProgramInterface2)interface,
+		static_cast<ProgramInterface2>(interface),
 		ProgramInterfacePName::ActiveResources);
 
 	for (auto i = 0; i < uniformBlocksCount; i++)
@@ -107,7 +102,7 @@ static void RetrieveProgramInterface(
 
 		GL::GetProgramResource(
 			program,
-			(ProgramInterface2)interface,
+			static_cast<ProgramInterface2>(interface),
 			i,
 			propNames,
 			props);
@@ -130,6 +125,8 @@ static void RetrieveStorageBlocksInterface(
 	GLuint program,
 	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>> &storage)
 {
+	NV_PROFILE_FUNC;
+
 	std::array<ProgramResourceProps, 2> propNames{ProgramResourceProps::BufferBinding, ProgramResourceProps::NameLength};
 	RetrieveProgramInterface(
 		program,
@@ -142,6 +139,8 @@ static void RetrieveUniformBlocksInterface(
 	GLuint program,
 	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>> &storage)
 {
+	NV_PROFILE_FUNC;
+
 	std::array<ProgramResourceProps, 2> propNames{ProgramResourceProps::BufferBinding, ProgramResourceProps::NameLength};
 	RetrieveProgramInterface(
 		program,
@@ -154,6 +153,8 @@ static void RetrieveInputInterface(
 	GLuint program,
 	std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>> &storage)
 {
+	NV_PROFILE_FUNC;
+
 	std::array<ProgramResourceProps, 2> propNames{ProgramResourceProps::Location, ProgramResourceProps::NameLength};
 	RetrieveProgramInterface(
 		program,
@@ -178,6 +179,155 @@ static std::unordered_map<std::string, GLuint, StringHash, std::equal_to<>> Retr
 	RetrieveStorageBlocksInterface(program, resources);
 
 	return resources;
+}
+
+static void SetProgramBinary(GLuint program, std::span<const std::byte> binary, GLenum binaryFormat)
+{
+	NV_PROFILE_FUNC;
+
+	assert_fits_in<GLsizei>(binary.size_bytes());
+	glProgramBinary(
+		program,
+		binaryFormat,
+		binary.data(),
+		static_cast<GLsizei>(binary.size_bytes()));
+}
+
+static GLuint CreateShaderStage(ShaderType type, const std::string_view source)
+{
+	NV_PROFILE_FUNC;
+
+	const auto stage = glCreateShader(static_cast<GLenum>(type));
+	const auto sourceData = source.data();
+	const auto length = source.size();
+	assert_fits_in<GLint>(length);
+
+	const auto _length = static_cast<GLint>(source.size());
+	glShaderSource(stage, 1, &sourceData, &_length);
+	glCompileShader(stage);
+
+	return stage;
+}
+
+static GLuint CreateShaderStage(const SourceShaderStage &stageInfo)
+{
+	NV_PROFILE_FUNC;
+
+	return CreateShaderStage(stageInfo.Type, stageInfo.Source);
+}
+
+static GLuint CreateShaderStage(const SourceFileShaderStage &stageInfo)
+{
+	NV_PROFILE_FUNC;
+
+	const auto source = File::ReadWholeText(stageInfo.Filepath);
+	return CreateShaderStage(stageInfo.Type, std::string_view(source.data(), source.size()));
+}
+
+static GLuint CreateShaderStage(ShaderType type, std::span<const std::byte> binary, GLenum binaryFormat)
+{
+	NV_PROFILE_FUNC;
+
+	if (!ShaderProgram::IsShaderBinarySupported())
+		throw std::runtime_error("Binary shader stages are not supported by the current OpenGL context.");
+
+	assert_fits_in<GLsizei>(binary.size_bytes());
+
+	const auto stage = glCreateShader(static_cast<GLenum>(type));
+	glShaderBinary(
+		1,
+		&stage,
+		binaryFormat,
+		binary.data(),
+		static_cast<GLsizei>(binary.size_bytes()));
+
+	return stage;
+}
+
+static GLuint CreateShaderStage(const BinaryShaderStage &stageInfo)
+{
+	NV_PROFILE_FUNC;
+
+	return CreateShaderStage(stageInfo.Type, stageInfo.Binary, stageInfo.BinaryFormat);
+}
+
+static GLuint CreateShaderStage(const BinaryFileShaderStage &stageInfo)
+{
+	NV_PROFILE_FUNC;
+
+	const auto binary = File::ReadWholeBinary(stageInfo.Filepath);
+	return CreateShaderStage(stageInfo.Type, binary, stageInfo.BinaryFormat);
+}
+
+static GLuint CreateShaderStage(ShaderType type, std::span<const std::byte> binary, const std::optional<ShaderSpecializeInfo> &specializeInfo)
+{
+	NV_PROFILE_FUNC;
+
+	assert_fits_in<GLsizei>(binary.size_bytes());
+
+	const auto stage = glCreateShader(static_cast<GLenum>(type));
+	glShaderBinary(
+		1,
+		&stage,
+		GL_SHADER_BINARY_FORMAT_SPIR_V,
+		binary.data(),
+		static_cast<GLsizei>(binary.size_bytes()));
+
+	if (specializeInfo.has_value())
+	{
+		const auto &specializeInfo_ = specializeInfo.value();
+		if (specializeInfo_.ConstantIndices.size() != specializeInfo_.ConstantValues.size())
+			throw std::runtime_error("Specialize contants indices and values count must match.");
+
+		assert_fits_in<GLuint>(specializeInfo_.ConstantIndices.size());
+
+		glSpecializeShader(
+			stage,
+			specializeInfo_.EntryPoint.data(),
+			static_cast<GLuint>(specializeInfo_.ConstantIndices.size()),
+			specializeInfo_.ConstantIndices.data(),
+			specializeInfo_.ConstantValues.data());
+	}
+
+	return stage;
+}
+
+static GLuint CreateShaderStage(const SPIRVShaderStage &stageInfo)
+{
+	NV_PROFILE_FUNC;
+
+	return CreateShaderStage(stageInfo.Type, stageInfo.Binary, stageInfo.SpecializeInfo);
+}
+
+static GLuint CreateShaderStage(const SPIRVFileShaderStage &stageInfo)
+{
+	NV_PROFILE_FUNC;
+
+	const auto binary = File::ReadWholeBinary(stageInfo.Filepath);
+	return CreateShaderStage(stageInfo.Type, binary, stageInfo.SpecializeInfo);
+}
+
+static ProgramDependency DependencyFromStage(const BinaryFileShaderStage &stage) noexcept
+{
+	return ProgramDependency{
+		.Timestamp = std::filesystem::last_write_time(stage.Filepath),
+		.Filepath = stage.Filepath,
+		.FileSize = std::filesystem::file_size(stage.Filepath),
+		.Data = BinaryStageDependency{
+			.ShaderType = stage.Type,
+			.BinaryFormat = stage.BinaryFormat,
+		}};
+}
+
+static ProgramDependency DependencyFromStage(const SourceFileShaderStage &stage) noexcept
+{
+	return ProgramDependency{
+		.Timestamp = std::filesystem::last_write_time(stage.Filepath),
+		.Filepath = stage.Filepath,
+		.FileSize = std::filesystem::file_size(stage.Filepath),
+		.Data = BinaryStageDependency{
+			.ShaderType = stage.Type,
+		}};
 }
 
 void ShaderProgram::ReleaseShaderCompiler() noexcept
@@ -230,117 +380,112 @@ void ShaderProgram::Use() const
 	glUseProgram(id_);
 }
 
-ShaderProgram ShaderProgram::FromBinary(GLenum binaryFormat, const std::span<std::byte> binary)
+ShaderProgram::ShaderProgram(GLID id)
+	: id_(id),
+	  resources_(RetrieveProgramInterface(id)) {}
+
+ShaderProgram::ShaderProgram(std::span<const std::byte> binary, GLenum binaryFormat)
 {
 	NV_PROFILE_FUNC;
 
-	return FromBinary(binaryFormat, binary.data(), binary.size_bytes());
-}
-
-ShaderProgram ShaderProgram::FromBinary(GLenum binaryFormat, const std::byte *binary, size_t binarySize)
-{
-	NV_PROFILE_FUNC;
-
-	if (!check_fits_in<GLsizei>(binarySize))
-		throw std::overflow_error("Binary size exceeds max allowed by OpenGL.");
-
-	ShaderProgram program;
-	program.id_ = glCreateProgram();
-	glProgramBinary(
-		program.id_,
-		binaryFormat,
-		binary,
-		(GLsizei)binarySize);
-
-	CheckProgramLinkStatus(program.id_);
-
-	program.resources_ = RetrieveProgramInterface(program.id_);
-
-	return program;
-}
-
-ShaderProgram ShaderProgram::FromBinary(
-	GLenum binaryFormat,
-	const std::filesystem::path &filepath)
-{
-	NV_PROFILE_FUNC;
-
-	const auto data = File::ReadWholeBinary(filepath);
-	return FromBinary(binaryFormat, data.data(), data.size() * sizeof(std::byte));
-}
-
-ShaderProgram::ShaderProgram(std::span<const ShaderStage> stages)
-{
-	NV_PROFILE_FUNC;
+	if (!IsProgramBinarySupported())
+		throw std::runtime_error("Binary shader programs are not supported by the current OpenGL context.");
 
 	id_ = glCreateProgram();
 
-	for (const auto &stage : stages)
-		glAttachShader(id_, stage.GetID());
-
-	{
-		NV_PROFILE_SCOPE("::LinkShaderProgram");
-		glLinkProgram(id_);
-	}
-
-	CleanUpAttachedShaders(id_);
+	SetProgramBinary(id_, binary, binaryFormat);
 	CheckProgramLinkStatus(id_);
-
 	resources_ = RetrieveProgramInterface(id_);
 }
 
-ShaderProgram::ShaderProgram(std::initializer_list<ShaderStage> stages)
-	: ShaderProgram(std::span(stages)) {}
-
-ShaderProgram::ShaderProgram(std::span<const ShaderStage> stages, std::span<const OutputLocation> outputs)
+ShaderProgram::ShaderProgram(std::filesystem::path binaryFile, GLenum binaryFormat)
 {
 	NV_PROFILE_FUNC;
 
+	if (!IsProgramBinarySupported())
+		throw std::runtime_error("Binary shader programs are not supported by the current OpenGL context.");
+
 	id_ = glCreateProgram();
 
-	for (const auto &stage : stages)
-		glAttachShader(id_, stage.GetID());
+	SetProgramBinary(id_, File::ReadWholeBinary(binaryFile), binaryFormat);
+	CheckProgramLinkStatus(id_);
+	resources_ = RetrieveProgramInterface(id_);
+
+	// TODO Maybe initialize dependencies_ with single dependency in initializer list
+	dependencies_.emplace_back(
+		ProgramDependency{
+			.Timestamp = std::filesystem::last_write_time(binaryFile),
+			.Filepath = binaryFile,
+			.FileSize = std::filesystem::file_size(binaryFile),
+			.Data = BinaryProgramDependency{
+				.BinaryFormat = binaryFormat,
+			}});
+}
+
+ShaderProgram::ShaderProgram(std::span<const ShaderStage> stages, std::span<const OutputLocation> outputs)
+	: id_(glCreateProgram())
+{
+	NV_PROFILE_FUNC;
+
+	for (const auto &stageInfo : stages)
+	{
+		const auto stage = std::visit(
+			[](const auto &info)
+			{
+				return CreateShaderStage(info);
+			},
+			stageInfo);
+		CheckShaderStatus(stage);
+		glAttachShader(id_, stage);
+	}
 
 	for (const auto &output : outputs)
 		glBindFragDataLocation(id_, output.Location, output.Name.c_str());
 
-	{
-		NV_PROFILE_SCOPE("::LinkShaderProgram");
-		glLinkProgram(id_);
-	}
+	glLinkProgram(id_);
 
 	CleanUpAttachedShaders(id_);
 	CheckProgramLinkStatus(id_);
 
 	resources_ = RetrieveProgramInterface(id_);
+
+	// TODO Maybe initialize dependencies_ with all dependencies in initializer list
+	for (const auto &stage : stages)
+	{
+		ProgramDependency dependency;
+
+		if (std::holds_alternative<BinaryFileShaderStage>(stage))
+			dependency = DependencyFromStage(std::get<BinaryFileShaderStage>(stage));
+		else if (std::holds_alternative<SourceFileShaderStage>(stage))
+			dependency = DependencyFromStage(std::get<SourceFileShaderStage>(stage));
+
+		dependencies_.emplace_back(std::move(dependency));
+	}
 }
 
 ShaderProgram::ShaderProgram(std::initializer_list<ShaderStage> stages, std::initializer_list<OutputLocation> outputs)
 	: ShaderProgram(std::span(stages), std::span(outputs)) {}
 
-ShaderProgram::ShaderProgram(ShaderProgram &&other) noexcept
-	: resources_(std::move(other.resources_)),
-	  savedBinary_(std::move(other.savedBinary_)),
-	  id_(other.id_) {}
-
-std::pair<const std::span<std::byte>, GLenum> ShaderProgram::GetBinary()
+std::pair<std::vector<std::byte>, GLenum> ShaderProgram::GetBinary() const
 {
 	NV_PROFILE_FUNC;
 
-	if (savedBinary_.has_value())
-	{
-		const auto &savedBinary = savedBinary_.value();
-		return std::make_pair(
-			std::span<std::byte>(savedBinary.Binary.get(), savedBinary.Size),
-			savedBinary.Format);
-	}
-
 	if (!ShaderProgram::IsProgramBinarySupported())
-		throw std::runtime_error("Current context doesn't support retrieving shader program binary.");
+		throw std::runtime_error("Current OpenGL context doesn't support retrieving shader program binary.");
 
-	savedBinary_ = RetrieveProgramBinary(id_);
+	GLint binarySize = 0;
+	glGetProgramiv(id_, GL_PROGRAM_BINARY_LENGTH, &binarySize);
 
-	return ShaderProgram::GetBinary();
+	GLenum binaryFormat = 0;
+	std::vector<std::byte> binary(binarySize);
+	glGetProgramBinary(
+		id_,
+		binarySize,
+		nullptr,
+		&binaryFormat,
+		binary.data());
+
+	return std::make_pair(std::move(binary), binaryFormat);
 }
 
 GLuint ShaderProgram::GetResourceLocation(const std::string_view name) const

@@ -222,45 +222,59 @@ static Nova::Framebuffer CreateFramebuffer(int width, int height)
     });
 }
 
-static Nova::ShaderProgram CreateDeferredGeometryProgram()
+static Nova::ShaderProgram CreateDeferredGeometryProgram(Nova::ShaderCache &cache)
 {
     NV_PROFILE_FUNC;
 
-    auto program = Nova::ShaderProgram(
+    auto program = cache.LoadCachedProgram(
+        "DeferredGeometry",
+        []()
         {
-            Nova::ShaderStage::FromGLSL(
-                Nova::ShaderType::Vertex,
-                std::filesystem::path("./assets/shaders/deferredGeometry.vert")),
-            Nova::ShaderStage::FromGLSL(
-                Nova::ShaderType::Fragment,
-                std::filesystem::path("./assets/shaders/deferredGeometry.frag")),
-        },
-        {
-            {"outColor", albedoAttachmentIndex},
-            {"outPosition", positionAttachmentIndex},
-            {"outNormal", normalAttachmentIndex},
-            {"outShininess", shininessAttachmentIndex},
+            return Nova::ShaderProgram(
+                {
+                    Nova::SourceFileShaderStage{
+                        .Type = Nova::ShaderType::Vertex,
+                        .Filepath = "./assets/shaders/deferredGeometry.vert",
+                    },
+                    Nova::SourceFileShaderStage{
+                        .Type = Nova::ShaderType::Fragment,
+                        .Filepath = "./assets/shaders/deferredGeometry.frag",
+                    },
+                },
+                {
+                    {"outColor", albedoAttachmentIndex},
+                    {"outPosition", positionAttachmentIndex},
+                    {"outNormal", normalAttachmentIndex},
+                    {"outShininess", shininessAttachmentIndex},
+                });
         });
     program.SetDebugName("GeometryProgram");
 
     return program;
 }
 
-static Nova::ShaderProgram CreateDeferredLightProgram(const Nova::Framebuffer &framebuffer, Nova::BindlessTextureBinder &textureBinder)
+static Nova::ShaderProgram CreateDeferredLightProgram(Nova::ShaderCache &cache, const Nova::Framebuffer &framebuffer, Nova::BindlessTextureBinder &textureBinder)
 {
     NV_PROFILE_FUNC;
 
-    auto program = Nova::ShaderProgram(
+    auto program = cache.LoadCachedProgram(
+        "DeferredLight",
+        []()
         {
-            Nova::ShaderStage::FromGLSL(
-                Nova::ShaderType::Vertex,
-                std::filesystem::path("./assets/shaders/deferredLighting.vert")),
-            Nova::ShaderStage::FromGLSL(
-                Nova::ShaderType::Fragment,
-                std::filesystem::path("./assets/shaders/deferredLighting.frag")),
-        },
-        {
-            {"outColor", colorAttachmentIndex},
+            return Nova::ShaderProgram(
+                {
+                    Nova::SourceFileShaderStage{
+                        .Type = Nova::ShaderType::Vertex,
+                        .Filepath = "./assets/shaders/deferredLighting.vert",
+                    },
+                    Nova::SourceFileShaderStage{
+                        .Type = Nova::ShaderType::Fragment,
+                        .Filepath = "./assets/shaders/deferredLighting.frag",
+                    },
+                },
+                {
+                    {"outColor", colorAttachmentIndex},
+                });
         });
     program.SetUniform(
         "uGBufferAlbedoSpecular",
@@ -279,42 +293,56 @@ static Nova::ShaderProgram CreateDeferredLightProgram(const Nova::Framebuffer &f
     return program;
 }
 
-static Nova::ShaderProgram CreateDeferredTransparentProgram()
+static Nova::ShaderProgram CreateDeferredTransparentProgram(Nova::ShaderCache &cache)
 {
     NV_PROFILE_FUNC;
 
-    auto program = Nova::ShaderProgram(
+    auto program = cache.LoadCachedProgram(
+        "DeferredTransparent",
+        []()
         {
-            Nova::ShaderStage::FromGLSL(
-                Nova::ShaderType::Vertex,
-                std::filesystem::path("./assets/shaders/deferredTransparent.vert")),
-            Nova::ShaderStage::FromGLSL(
-                Nova::ShaderType::Fragment,
-                std::filesystem::path("./assets/shaders/deferredTransparent.frag")),
-        },
-        {
-            {"outColor", colorAttachmentIndex},
+            return Nova::ShaderProgram(
+                {
+                    Nova::SourceFileShaderStage{
+                        .Type = Nova::ShaderType::Vertex,
+                        .Filepath = "./assets/shaders/deferredTransparent.vert",
+                    },
+                    Nova::SourceFileShaderStage{
+                        .Type = Nova::ShaderType::Fragment,
+                        .Filepath = "./assets/shaders/deferredTransparent.frag",
+                    },
+                },
+                {
+                    {"outColor", colorAttachmentIndex},
+                });
         });
     program.SetDebugName("TransparentProgram");
 
     return program;
 }
 
-static Nova::ShaderProgram CreateDeferredFogProgram(const Nova::Framebuffer &framebuffer, Nova::BindlessTextureBinder &textureBinder)
+static Nova::ShaderProgram CreateDeferredFogProgram(Nova::ShaderCache &cache, const Nova::Framebuffer &framebuffer, Nova::BindlessTextureBinder &textureBinder)
 {
     NV_PROFILE_FUNC;
 
-    auto program = Nova::ShaderProgram(
+    auto program = cache.LoadCachedProgram(
+        "DeferredFog",
+        []()
         {
-            Nova::ShaderStage::FromGLSL(
-                Nova::ShaderType::Vertex,
-                std::filesystem::path("./assets/shaders/deferredFog.vert")),
-            Nova::ShaderStage::FromGLSL(
-                Nova::ShaderType::Fragment,
-                std::filesystem::path("./assets/shaders/deferredFog.frag")),
-        },
-        {
-            {"outColor", finalAttachmentIndex},
+            return Nova::ShaderProgram(
+                {
+                    Nova::SourceFileShaderStage{
+                        .Type = Nova::ShaderType::Vertex,
+                        .Filepath = "./assets/shaders/deferredFog.vert",
+                    },
+                    Nova::SourceFileShaderStage{
+                        .Type = Nova::ShaderType::Fragment,
+                        .Filepath = "./assets/shaders/deferredFog.frag",
+                    },
+                },
+                {
+                    {"outColor", finalAttachmentIndex},
+                });
         });
     program.SetUniform(
         "uSceneColor",
@@ -327,21 +355,28 @@ static Nova::ShaderProgram CreateDeferredFogProgram(const Nova::Framebuffer &fra
     return program;
 }
 
-static Nova::ShaderProgram CreateSkyboxProgram()
+static Nova::ShaderProgram CreateSkyboxProgram(Nova::ShaderCache &cache)
 {
     NV_PROFILE_FUNC;
 
-    auto program = Nova::ShaderProgram(
+    auto program = cache.LoadCachedProgram(
+        "DeferredSkybox",
+        []()
         {
-            Nova::ShaderStage::FromGLSL(
-                Nova::ShaderType::Vertex,
-                std::filesystem::path("./assets/shaders/skybox.vert")),
-            Nova::ShaderStage::FromGLSL(
-                Nova::ShaderType::Fragment,
-                std::filesystem::path("./assets/shaders/skybox.frag")),
-        },
-        {
-            {"outColor", colorAttachmentIndex},
+            return Nova::ShaderProgram(
+                {
+                    Nova::SourceFileShaderStage{
+                        .Type = Nova::ShaderType::Vertex,
+                        .Filepath = "./assets/shaders/skybox.vert",
+                    },
+                    Nova::SourceFileShaderStage{
+                        .Type = Nova::ShaderType::Fragment,
+                        .Filepath = "./assets/shaders/skybox.frag",
+                    },
+                },
+                {
+                    {"outColor", colorAttachmentIndex},
+                });
         });
     program.SetDebugName("SkyboxProgram");
 
@@ -454,11 +489,12 @@ Nova::Renderer::Renderer(const Window &window)
       whiteTexture_(CreateWhiteTexture()),
       whiteTextureHandle_(textureBinder_.Bind(whiteTexture_, true)),
       framebuffer_(CreateFramebuffer(window.GetWidth(), window.GetHeight())),
-      deferredGeometryProgram_(CreateDeferredGeometryProgram()),
-      deferredLightProgram_(CreateDeferredLightProgram(framebuffer_, textureBinder_)),
-      deferredTransparentProgram_(CreateDeferredTransparentProgram()),
-      deferredFogProgram_(CreateDeferredFogProgram(framebuffer_, textureBinder_)),
-      skyboxProgram_(CreateSkyboxProgram()),
+      shaderCache_("./shadercache"),
+      deferredGeometryProgram_(CreateDeferredGeometryProgram(shaderCache_)),
+      deferredLightProgram_(CreateDeferredLightProgram(shaderCache_, framebuffer_, textureBinder_)),
+      deferredTransparentProgram_(CreateDeferredTransparentProgram(shaderCache_)),
+      deferredFogProgram_(CreateDeferredFogProgram(shaderCache_, framebuffer_, textureBinder_)),
+      skyboxProgram_(CreateSkyboxProgram(shaderCache_)),
       instanceBuffer_(CreateInstanceBuffer()),
       instanceBufferData_(instanceBuffer_.GetRegion<InstanceData>(0, sizeof(InstanceData) * maxInstanceCount)),
       cameraBuffer_(CreateCameraBuffer()),
