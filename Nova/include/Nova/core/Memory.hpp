@@ -65,9 +65,9 @@ template <typename TDst, typename TSrc>
 constexpr bool check_fits_in([[maybe_unused]] TSrc value) noexcept
 {
 #if NV_DEBUG
-    if (std::numeric_limits<TDst>::is_signed == std::numeric_limits<TSrc>::is_signed)
+    if constexpr (std::numeric_limits<TDst>::is_signed == std::numeric_limits<TSrc>::is_signed)
         return value >= std::numeric_limits<TDst>::min() && value <= std::numeric_limits<TDst>::max();
-    else if (std::numeric_limits<TDst>::is_signed)
+    else if constexpr (std::numeric_limits<TDst>::is_signed)
         return value <= std::numeric_limits<TDst>::max();
     else
         return value >= 0 && value <= std::numeric_limits<TDst>::max();
