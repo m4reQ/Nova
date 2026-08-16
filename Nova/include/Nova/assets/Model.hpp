@@ -20,15 +20,15 @@ namespace Nova
 
 		constexpr AssetType GetType() const noexcept override { return AssetType::Model; }
 
-		constexpr void SetModelBuffer(std::shared_ptr<Buffer> &&buffer) noexcept { modelBuffer_ = std::move(buffer); }
+		void SetModelBuffer(std::shared_ptr<Buffer> &&buffer) noexcept { modelBuffer_ = std::move(buffer); }
 
-		constexpr void SetIndexBuffer(std::shared_ptr<Buffer> &&buffer) noexcept { indexBuffer_ = std::move(buffer); }
+		void SetIndexBuffer(std::shared_ptr<Buffer> &&buffer) noexcept { indexBuffer_ = std::move(buffer); }
 
 		const std::shared_ptr<Buffer> GetModelDataBuffer() const noexcept { return modelBuffer_; }
 
 		const std::shared_ptr<Buffer> GetIndexBuffer() const noexcept { return indexBuffer_; }
 
-		constexpr bool UsesIndexBuffer() const noexcept { return indexBuffer_ != nullptr; }
+		bool UsesIndexBuffer() const noexcept { return indexBuffer_ != nullptr; }
 
 		constexpr size_t GetIndexDataSize() const noexcept { return indexBuffer_ != nullptr ? indexBuffer_->GetSize() : 0zu; }
 
