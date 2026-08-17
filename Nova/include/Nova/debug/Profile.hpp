@@ -3,10 +3,13 @@
 #include <string_view>
 #include <chrono>
 
+#define NV_MACRO_CONCAT_IMPL(a, b) a##b
+#define NV_MACRO_CONCAT(a, b) NV_MACRO_CONCAT_IMPL(a, b)
+
 #ifdef NV_DEBUG
 #define NV_PROFILE_SET_ENABLED(isEnabled) Nova::Profile::SetEnabled(isEnabled)
 #define NV_PROFILE_FUNC const Nova::_ProfileFrame _profileFrame(__FUNCTION__)
-#define NV_PROFILE_SCOPE(name) const Nova::_ProfileFrame _profileFrame##__LINE__(name)
+#define NV_PROFILE_SCOPE(name) const Nova::_ProfileFrame NV_MACRO_CONCAT(_profileFrame, __LINE__)(name)
 #define NV_PROFILE_EVENT(name) Nova::Profile::_WriteProfileEvent(name)
 #define NV_PROFILE_COUNTER(name, value) Nova::Profile::_WriteProfileCounter(name, value)
 #define NV_PROFILE_BEGIN_SESSION(filepath) Nova::Profile::BeginSession(filepath)
