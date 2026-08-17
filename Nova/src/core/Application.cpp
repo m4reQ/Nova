@@ -1,5 +1,6 @@
 #include <Nova/core/Application.hpp>
 #include <Nova/core/System.hpp>
+#include <Nova/assets/Assets.hpp>
 #include <Nova/debug/Profile.hpp>
 
 using FrameClock = std::chrono::high_resolution_clock;
@@ -22,7 +23,10 @@ Nova::Application::Application(const std::string_view name, const StartupData &s
 
 void Nova::Application::Run()
 {
-    OnLoad();
+    {
+        NV_PROFILE_SCOPE("::Load");
+        OnLoad();
+    }
 
     while (!window_.ShouldClose())
     {
@@ -32,14 +36,25 @@ void Nova::Application::Run()
 
         const auto frameStart = FrameClock::now();
 
+        // TODO Convert asset system to an object
+        Nova::Assets::ProcessLoadingTasks_();
         window_.ProcessEvents();
         eventSystem_.ProcessEventQueue(
             [&](const Event &event)
             {
                 OnEvent(event);
             });
-        OnUpdate();
-        OnRender();
+
+        {
+            NV_PROFILE_SCOPE("::Update");
+            OnUpdate();
+        }
+
+        {
+            NV_PROFILE_SCOPE("::Render");
+            OnRender();
+        }
+
         window_.SwapBuffers();
 
         frametime_ = GetDurationSeconds(frameStart, FrameClock::now());
