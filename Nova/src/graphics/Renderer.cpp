@@ -884,6 +884,11 @@ void Nova::Renderer::DisplayFramebuffer(const Window &window) const noexcept
         GL_NEAREST);
 }
 
+const Nova::FramebufferAttachment &Nova::Renderer::GetFramebufferAttachment(Nova::FramebufferAttachmentType type) noexcept
+{
+    return framebuffer_.GetAttachment(static_cast<size_t>(type));
+}
+
 std::vector<Nova::InstanceData> &Nova::Renderer::GetInstanceDataForModel(std::shared_ptr<Buffer> modelBuffer, bool useAlpha) noexcept
 {
     const auto &it = drawData_.find(modelBuffer);

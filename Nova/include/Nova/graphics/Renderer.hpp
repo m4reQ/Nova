@@ -90,6 +90,17 @@ namespace Nova
         glm::vec4 ClearColor;
     };
 
+    enum class FramebufferAttachmentType : size_t
+    {
+        Albedo = 0,
+        Position = 1,
+        Normal = 2,
+        Color = 3,
+        Final = 4,
+        Shininess = 5,
+        Depth = 6,
+    };
+
     class Renderer
     {
     public:
@@ -155,6 +166,8 @@ namespace Nova
             unsigned int frameWidth,
             unsigned int frameHeight,
             std::shared_ptr<Texture> skyboxTexture);
+
+        const FramebufferAttachment &GetFramebufferAttachment(FramebufferAttachmentType type) noexcept;
 
         void DisplayFramebuffer(const Window &window) const noexcept;
 
