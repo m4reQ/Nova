@@ -99,6 +99,7 @@ namespace Nova
         Final = 4,
         Shininess = 5,
         Depth = 6,
+        EnumMax_,
     };
 
     class Renderer
@@ -167,7 +168,9 @@ namespace Nova
             unsigned int frameHeight,
             std::shared_ptr<Texture> skyboxTexture);
 
-        const FramebufferAttachment &GetFramebufferAttachment(FramebufferAttachmentType type) noexcept;
+        const FramebufferAttachment &GetFramebufferAttachment(FramebufferAttachmentType type) const noexcept;
+
+        const Texture &GetWhiteTexture() const noexcept;
 
         void DisplayFramebuffer(const Window &window) const noexcept;
 
