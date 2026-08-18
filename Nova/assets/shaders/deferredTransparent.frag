@@ -27,9 +27,9 @@ in vec3 vsPosition;
 in vec3 vsNormal;
 in vec2 vsTexCoord;
 
-out vec4 outColor;
+layout(location = 0) out vec4 outColor;
 
-uniform float uAmbient;
+uniform vec4 uAmbient;
 uniform uint uPointLightsCount;
 uniform uint uDirLightsCount;
 
@@ -68,7 +68,7 @@ void main()
     vec3 normal = normalize(vsNormal);
     
     vec3 viewDir = normalize(cameraPosition - vsPosition);
-    vec3 lighting = baseColor * uAmbient;
+    vec3 lighting = baseColor * uAmbient.rgb * uAmbient.a;
 
     for (uint i = 0; i < uDirLightsCount; i++)
     {

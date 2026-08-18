@@ -14,10 +14,10 @@ in vec3 vsPosition;
 in vec3 vsNormal;
 in vec2 vsTexCoord;
 
-out vec4 outColor;
-out vec3 outPosition;
-out vec3 outNormal;
-out vec3 outShininess;
+layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec3 outPosition;
+layout(location = 2) out vec3 outNormal;
+layout(location = 3) out vec3 outShininess;
 
 layout(std430, binding = 1) buffer sMaterialData
 {

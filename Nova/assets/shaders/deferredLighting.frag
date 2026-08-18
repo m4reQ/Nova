@@ -14,7 +14,7 @@ struct DirLight
     vec3 direction;
 };
 
-out vec4 outColor;
+layout(location = 0) out vec4 outColor;
 
 in vec2 vsTexCoord;
 
@@ -22,7 +22,7 @@ layout(bindless_sampler) uniform sampler2D uGBufferAlbedoSpecular;
 layout(bindless_sampler) uniform sampler2D uGBufferPosition;
 layout(bindless_sampler) uniform sampler2D uGBufferNormal;
 layout(bindless_sampler) uniform sampler2D uGBufferShininess;
-uniform float uAmbient;
+uniform vec4 uAmbient;
 uniform uint uPointLightsCount;
 uniform uint uDirLightsCount;
 
@@ -101,7 +101,7 @@ void main()
     vec4 albedoSpecular = texture(uGBufferAlbedoSpecular, vsTexCoord);
     float shininess = texture(uGBufferShininess, vsTexCoord).x;
 
-    vec3 lighting = albedoSpecular.rgb * uAmbient;
+    vec3 lighting = albedoSpecular.rgb * uAmbient.rgb * uAmbient.a;
 
     vec3 viewDir = normalize(cameraPosition - fragPos);
 
