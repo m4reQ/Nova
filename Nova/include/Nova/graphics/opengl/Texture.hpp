@@ -68,6 +68,8 @@ namespace Nova
 
 		constexpr TextureTarget GetTarget() const noexcept override { return target_; }
 
+		void SetDebugName(const std::string_view name);
+
 		constexpr Texture &operator=(Texture &&other) noexcept
 		{
 			id_ = std::exchange(other.id_, 0);

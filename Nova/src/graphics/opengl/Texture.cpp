@@ -2,18 +2,16 @@
 #include <Nova/debug/Profile.hpp>
 #include <stdexcept>
 
-using namespace Nova;
-
-static void CreateTextureStorage(TextureTarget target, GLuint texture, const TextureSpec &spec) noexcept
+static void CreateTextureStorage(Nova::TextureTarget target, GLuint texture, const Nova::TextureSpec &spec) noexcept
 {
     NV_PROFILE_FUNC;
 
     switch (target)
     {
-    case TextureTarget::Texture2D:
-    case TextureTarget::Texture1DArray:
-    case TextureTarget::TextureCubeMap:
-        GL::TextureStorage2D(
+    case Nova::TextureTarget::Texture2D:
+    case Nova::TextureTarget::Texture1DArray:
+    case Nova::TextureTarget::TextureCubeMap:
+        Nova::GL::TextureStorage2D(
             texture,
             spec.Mipmaps,
             spec.Format,
@@ -23,7 +21,7 @@ static void CreateTextureStorage(TextureTarget target, GLuint texture, const Tex
     }
 }
 
-Texture::Texture(TextureTarget target, const TextureSpec &spec)
+Nova::Texture::Texture(TextureTarget target, const TextureSpec &spec)
     : target_(target), spec_(spec)
 {
     NV_PROFILE_FUNC;
@@ -46,19 +44,19 @@ Texture::Texture(TextureTarget target, const TextureSpec &spec)
         throw std::runtime_error("Failed to create texture.");
 }
 
-Texture::~Texture() noexcept
+Nova::Texture::~Texture() noexcept
 {
     if (id_)
         GL::DeleteTexture(id_);
 }
 
-void Texture::Bind(GLuint unit) const noexcept
+void Nova::Texture::Bind(GLuint unit) const noexcept
 {
     NV_PROFILE_FUNC;
     glBindTextureUnit(unit, id_);
 }
 
-void Texture::Upload(const TextureUploadInfo &info, const void *data, bool generateMipmap) const noexcept
+void Nova::Texture::Upload(const TextureUploadInfo &info, const void *data, bool generateMipmap) const noexcept
 {
     NV_PROFILE_FUNC;
 
@@ -95,6 +93,11 @@ void Texture::Upload(const TextureUploadInfo &info, const void *data, bool gener
     }
 }
 
-void Texture::UploadFromPBO() const noexcept
+void Nova::Texture::UploadFromPBO() const noexcept
 {
+}
+
+void Nova::Texture::SetDebugName(const std::string_view name)
+{
+    GL::ObjectLabel(ObjectIdentifier::Texture, id_, name);
 }
