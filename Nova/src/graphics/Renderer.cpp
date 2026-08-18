@@ -168,6 +168,7 @@ static Nova::Texture CreateWhiteTexture()
             .PixelType = Nova::PixelType::UnsignedByte},
         whiteTextureData.data(),
         true);
+    texture.SetDebugName("WhiteTexture");
 
     return texture;
 }
@@ -240,12 +241,6 @@ static Nova::ShaderProgram CreateDeferredGeometryProgram(Nova::ShaderCache &cach
                         .Type = Nova::ShaderType::Fragment,
                         .Filepath = "./assets/shaders/deferredGeometry.frag",
                     },
-                },
-                {
-                    {"outColor", albedoAttachmentIndex},
-                    {"outPosition", positionAttachmentIndex},
-                    {"outNormal", normalAttachmentIndex},
-                    {"outShininess", shininessAttachmentIndex},
                 });
         });
     program.SetDebugName("GeometryProgram");
@@ -271,9 +266,6 @@ static Nova::ShaderProgram CreateDeferredLightProgram(Nova::ShaderCache &cache, 
                         .Type = Nova::ShaderType::Fragment,
                         .Filepath = "./assets/shaders/deferredLighting.frag",
                     },
-                },
-                {
-                    {"outColor", colorAttachmentIndex},
                 });
         });
     program.SetUniform(
@@ -311,9 +303,6 @@ static Nova::ShaderProgram CreateDeferredTransparentProgram(Nova::ShaderCache &c
                         .Type = Nova::ShaderType::Fragment,
                         .Filepath = "./assets/shaders/deferredTransparent.frag",
                     },
-                },
-                {
-                    {"outColor", colorAttachmentIndex},
                 });
         });
     program.SetDebugName("TransparentProgram");
@@ -339,9 +328,6 @@ static Nova::ShaderProgram CreateDeferredFogProgram(Nova::ShaderCache &cache, co
                         .Type = Nova::ShaderType::Fragment,
                         .Filepath = "./assets/shaders/deferredFog.frag",
                     },
-                },
-                {
-                    {"outColor", finalAttachmentIndex},
                 });
         });
     program.SetUniform(
@@ -373,9 +359,6 @@ static Nova::ShaderProgram CreateSkyboxProgram(Nova::ShaderCache &cache)
                         .Type = Nova::ShaderType::Fragment,
                         .Filepath = "./assets/shaders/skybox.frag",
                     },
-                },
-                {
-                    {"outColor", colorAttachmentIndex},
                 });
         });
     program.SetDebugName("SkyboxProgram");
@@ -675,63 +658,77 @@ void Nova::Renderer::Render(
         });
 }
 
-void Nova::Renderer::Draw(
-    unsigned int frameWidth,
-    unsigned int frameHeight,
-    std::shared_ptr<Texture> skyboxTexture)
+void Nova::Renderer::ResizeFramebuffer(unsigned int frameWidth, unsigned int frameHeight) noexcept
 {
-    if (frameWidth != frameInfo_.Width || frameHeight != frameInfo_.Height)
-    {
-        for (const auto &attachment : framebuffer_.GetAttachments())
-            textureBinder_.Unbind(attachment, true);
+    NV_PROFILE_FUNC;
 
-        framebuffer_.Resize(frameWidth, frameHeight);
+    if (frameWidth == frameInfo_.Width && frameHeight == frameInfo_.Height)
+        return;
 
-        deferredLightProgram_.SetUniform(
-            "uGBufferAlbedoSpecular",
-            textureBinder_.Bind(framebuffer_.GetAttachment(albedoAttachmentIndex), true));
-        deferredLightProgram_.SetUniform(
-            "uGBufferPosition",
-            textureBinder_.Bind(framebuffer_.GetAttachment(positionAttachmentIndex), true));
-        deferredLightProgram_.SetUniform(
-            "uGBufferNormal",
-            textureBinder_.Bind(framebuffer_.GetAttachment(normalAttachmentIndex), true));
-        deferredLightProgram_.SetUniform(
-            "uGBufferShininess",
-            textureBinder_.Bind(framebuffer_.GetAttachment(shininessAttachmentIndex), true));
-        deferredFogProgram_.SetUniform(
-            "uSceneColor",
-            textureBinder_.Bind(framebuffer_.GetAttachment(colorAttachmentIndex), true));
-        deferredFogProgram_.SetUniform(
-            "uDepth",
-            textureBinder_.Bind(framebuffer_.GetAttachment(depthAttachmentIndex), true));
+    for (const auto &attachment : framebuffer_.GetAttachments())
+        textureBinder_.Unbind(attachment, true);
 
-        frameInfo_.Width = frameWidth;
-        frameInfo_.Height = frameHeight;
-    }
+    framebuffer_.Resize(frameWidth, frameHeight);
 
-    textureBinder_.Update();
-    framebuffer_.Bind();
+    deferredLightProgram_.SetUniform(
+        "uGBufferAlbedoSpecular",
+        textureBinder_.Bind(framebuffer_.GetAttachment(albedoAttachmentIndex), true));
+    deferredLightProgram_.SetUniform(
+        "uGBufferPosition",
+        textureBinder_.Bind(framebuffer_.GetAttachment(positionAttachmentIndex), true));
+    deferredLightProgram_.SetUniform(
+        "uGBufferNormal",
+        textureBinder_.Bind(framebuffer_.GetAttachment(normalAttachmentIndex), true));
+    deferredLightProgram_.SetUniform(
+        "uGBufferShininess",
+        textureBinder_.Bind(framebuffer_.GetAttachment(shininessAttachmentIndex), true));
+    deferredFogProgram_.SetUniform(
+        "uSceneColor",
+        textureBinder_.Bind(framebuffer_.GetAttachment(colorAttachmentIndex), true));
+    deferredFogProgram_.SetUniform(
+        "uDepth",
+        textureBinder_.Bind(framebuffer_.GetAttachment(depthAttachmentIndex), true));
+}
+
+void Nova::Renderer::ClearFramebuffer(const glm::vec4 &clearColor) noexcept
+{
+    NV_PROFILE_FUNC;
 
     GL::DepthMask(true);
+
+    std::array<GLenum, 6> drawBuffers{
+        GL_COLOR_ATTACHMENT0,
+        GL_COLOR_ATTACHMENT1,
+        GL_COLOR_ATTACHMENT2,
+        GL_COLOR_ATTACHMENT3,
+        GL_COLOR_ATTACHMENT4,
+        GL_COLOR_ATTACHMENT5,
+    };
+    glNamedFramebufferDrawBuffers(
+        framebuffer_.GetID(),
+        static_cast<GLsizei>(drawBuffers.size()),
+        drawBuffers.data());
 
     framebuffer_.ClearAttachment(albedoAttachmentIndex, frameInfo_.ClearColor);
     framebuffer_.ClearAttachment(positionAttachmentIndex, glm::vec4(0.0f));
     framebuffer_.ClearAttachment(normalAttachmentIndex, glm::vec4(0.0f));
-    framebuffer_.ClearAttachment(colorAttachmentIndex, glm::vec4(0.0f));
+    framebuffer_.ClearAttachment(colorAttachmentIndex, clearColor);
     framebuffer_.ClearAttachment(finalAttachmentIndex, glm::vec4(0.0f));
     framebuffer_.ClearAttachment(shininessAttachmentIndex, glm::vec4(0.0f));
     framebuffer_.ClearAttachment(1.0f, 0);
+}
 
-    vertexArray_.Use();
+void Nova::Renderer::WaitForFrameSync() noexcept
+{
+    NV_PROFILE_FUNC;
 
     frameSync_.WaitClient(SyncTimeoutInfinite);
+}
 
-    materialsBufferData_.Commit();
-    const auto pointLightsCount = static_cast<GLuint>(pointLightsData_.Commit());
-    const auto dirLightsCount = static_cast<GLuint>(dirLightsData_.Commit());
+void Nova::Renderer::ExecuteGeometryPass() noexcept
+{
+    NV_PROFILE_FUNC;
 
-    // geometry pass
     materialsBuffer_.Bind(
         BufferBaseTarget::ShaderStorageBuffer,
         deferredGeometryProgram_.GetResourceLocation("sMaterialData"));
@@ -746,15 +743,29 @@ void Nova::Renderer::Draw(
     GL::DepthFunc(DepthFunction::LessEqual);
     GL::DepthMask(true);
 
+    std::array<GLenum, 4> drawBuffers{
+        GL_COLOR_ATTACHMENT0 + albedoAttachmentIndex,
+        GL_COLOR_ATTACHMENT0 + positionAttachmentIndex,
+        GL_COLOR_ATTACHMENT0 + normalAttachmentIndex,
+        GL_COLOR_ATTACHMENT0 + shininessAttachmentIndex,
+    };
+    glNamedFramebufferDrawBuffers(
+        framebuffer_.GetID(),
+        static_cast<GLsizei>(drawBuffers.size()),
+        drawBuffers.data());
+
     for (auto &[model, drawData] : drawData_)
     {
         DrawBatch(model, drawData.OpaqueInstanceData);
         drawData.OpaqueInstanceData.clear();
     }
+}
 
-    // lighting pass
-    // TODO Get ambient intensity from frame config
-    deferredLightProgram_.SetUniform("uAmbient", 0.5f);
+void Nova::Renderer::ExecuteLightingPass(const glm::vec4 &ambientColor, unsigned int pointLightsCount, unsigned int dirLightsCount) noexcept
+{
+    NV_PROFILE_FUNC;
+
+    deferredLightProgram_.SetUniform("uAmbient", ambientColor);
     deferredLightProgram_.SetUniform("uPointLightsCount", pointLightsCount);
     deferredLightProgram_.SetUniform("uDirLightsCount", dirLightsCount);
     deferredLightProgram_.Use();
@@ -777,28 +788,63 @@ void Nova::Renderer::Draw(
     GL::Disable(EnableCap::DepthTest);
     GL::DepthMask(false);
 
+    std::array<GLenum, 1> drawBuffers{
+        GL_COLOR_ATTACHMENT0 + colorAttachmentIndex,
+    };
+    glNamedFramebufferDrawBuffers(
+        framebuffer_.GetID(),
+        static_cast<GLsizei>(drawBuffers.size()),
+        drawBuffers.data());
+
     glDrawArrays(GL_TRIANGLES, 0, 6);
+    frameInfo_.DrawCalls++;
 
-    framebuffer_.Invalidate({
-        GL_COLOR_ATTACHMENT0,
-        GL_COLOR_ATTACHMENT1,
-        GL_COLOR_ATTACHMENT2,
-    });
+    // #ifndef NV_DEBUG
+    //     framebuffer_.Invalidate({
+    //         GL_COLOR_ATTACHMENT0,
+    //         GL_COLOR_ATTACHMENT1,
+    //         GL_COLOR_ATTACHMENT2,
+    //         GL_COLOR_ATTACHMENT5,
+    //     });
+    // #endif
+}
 
-    // skybox pass
-    if (skyboxTexture != nullptr)
-    {
-        skyboxProgram_.Use();
-        skyboxProgram_.SetUniform("uSkybox", textureBinder_.Bind(*skyboxTexture));
+void Nova::Renderer::ExecuteSkyboxPass(const std::shared_ptr<Texture> &skyboxTexture) noexcept
+{
+    NV_PROFILE_FUNC;
 
-        GL::Enable(EnableCap::DepthTest);
-        GL::DepthFunc(DepthFunction::LessEqual);
-        GL::DepthMask(false);
+    if (skyboxTexture == nullptr)
+        return;
 
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-    }
+    skyboxProgram_.Use();
+    skyboxProgram_.SetUniform("uSkybox", textureBinder_.Bind(*skyboxTexture));
 
-    // transparent pass
+    GL::Enable(EnableCap::DepthTest);
+    GL::DepthFunc(DepthFunction::LessEqual);
+    GL::DepthMask(false);
+
+    std::array<GLenum, 1> drawBuffers{
+        GL_COLOR_ATTACHMENT0 + colorAttachmentIndex,
+    };
+    glNamedFramebufferDrawBuffers(
+        framebuffer_.GetID(),
+        static_cast<GLsizei>(drawBuffers.size()),
+        drawBuffers.data());
+
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    frameInfo_.DrawCalls++;
+
+    // #ifndef NV_DEBUG
+    //     framebuffer_.Invalidate({
+    //         GL_COLOR_ATTACHMENT3,
+    //     });
+    // #endif
+}
+
+void Nova::Renderer::ExecuteTransparentPass(const glm::vec4 &ambientColor, unsigned int pointLightsCount, unsigned int dirLightsCount) noexcept
+{
+    NV_PROFILE_FUNC;
+
     const auto hasAnyTransparentObjects = std::any_of(
         drawData_.begin(),
         drawData_.end(),
@@ -806,57 +852,112 @@ void Nova::Renderer::Draw(
         {
             return x.second.TransparentInstanceData.size() > 0;
         });
-    if (hasAnyTransparentObjects)
+    if (!hasAnyTransparentObjects)
+        return;
+
+    deferredTransparentProgram_.SetUniform("uAmbient", ambientColor);
+    deferredTransparentProgram_.SetUniform("uPointLightsCount", pointLightsCount);
+    deferredTransparentProgram_.SetUniform("uDirLightsCount", dirLightsCount);
+    deferredTransparentProgram_.Use();
+
+    materialsBuffer_.Bind(
+        BufferBaseTarget::ShaderStorageBuffer,
+        deferredTransparentProgram_.GetResourceLocation("sMaterialData"));
+
+    cameraBuffer_.Bind(
+        BufferBaseTarget::UniformBuffer,
+        deferredTransparentProgram_.GetResourceLocation("uCameraData"));
+
+    lightsBuffer_.Bind(
+        BufferBaseTarget::ShaderStorageBuffer,
+        deferredTransparentProgram_.GetResourceLocation("sPointLightsBuffer"),
+        0,
+        sizeof(PointLightData) * maxPointLights);
+
+    lightsBuffer_.Bind(
+        BufferBaseTarget::ShaderStorageBuffer,
+        deferredTransparentProgram_.GetResourceLocation("sDirLightsBuffer"),
+        sizeof(PointLightData) * maxPointLights,
+        sizeof(DirLightData) * maxDirLights);
+
+    GL::Enable(EnableCap::DepthTest);
+    GL::DepthFunc(DepthFunction::LessEqual);
+    GL::DepthMask(false);
+
+    GL::Enable(EnableCap::Blend);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    std::array<GLenum, 1> drawBuffers{
+        GL_COLOR_ATTACHMENT0 + colorAttachmentIndex,
+    };
+    glNamedFramebufferDrawBuffers(
+        framebuffer_.GetID(),
+        static_cast<GLsizei>(drawBuffers.size()),
+        drawBuffers.data());
+
+    for (auto &[model, drawData] : drawData_)
     {
-        deferredTransparentProgram_.SetUniform("uAmbient", 0.5f);
-        deferredTransparentProgram_.SetUniform("uPointLightsCount", pointLightsCount);
-        deferredTransparentProgram_.SetUniform("uDirLightsCount", dirLightsCount);
-        deferredTransparentProgram_.Use();
-
-        materialsBuffer_.Bind(
-            BufferBaseTarget::ShaderStorageBuffer,
-            deferredTransparentProgram_.GetResourceLocation("sMaterialData"));
-
-        cameraBuffer_.Bind(
-            BufferBaseTarget::UniformBuffer,
-            deferredTransparentProgram_.GetResourceLocation("uCameraData"));
-
-        lightsBuffer_.Bind(
-            BufferBaseTarget::ShaderStorageBuffer,
-            deferredTransparentProgram_.GetResourceLocation("sPointLightsBuffer"),
-            0,
-            sizeof(PointLightData) * maxPointLights);
-
-        lightsBuffer_.Bind(
-            BufferBaseTarget::ShaderStorageBuffer,
-            deferredTransparentProgram_.GetResourceLocation("sDirLightsBuffer"),
-            sizeof(PointLightData) * maxPointLights,
-            sizeof(DirLightData) * maxDirLights);
-
-        GL::Enable(EnableCap::DepthTest);
-        GL::DepthFunc(DepthFunction::LessEqual);
-        GL::DepthMask(false);
-
-        GL::Enable(EnableCap::Blend);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        for (auto &[model, drawData] : drawData_)
-        {
-            SortTransparentObjects(drawData.TransparentInstanceData, cameraPosition_);
-            DrawBatch(model, drawData.TransparentInstanceData);
-            drawData.TransparentInstanceData.clear();
-        }
+        SortTransparentObjects(drawData.TransparentInstanceData, cameraPosition_);
+        DrawBatch(model, drawData.TransparentInstanceData);
+        drawData.TransparentInstanceData.clear();
     }
+}
 
-    // fog pass
+void Nova::Renderer::ExecuteFogPass(const glm::vec4 &fogColor) noexcept
+{
+    NV_PROFILE_FUNC;
+
+    cameraBuffer_.Bind(
+        BufferBaseTarget::UniformBuffer,
+        deferredFogProgram_.GetResourceLocation("uCameraData"));
+
     deferredFogProgram_.Use();
-    // TODO Get fog color from frame settings
-    deferredFogProgram_.SetUniform("uFogColor", glm::vec4(1.0f, 1.0f, 1.0f, 0.01f));
+    deferredFogProgram_.SetUniform("uFogColor", fogColor);
 
     GL::Disable(EnableCap::DepthTest);
     GL::DepthMask(false);
 
+    std::array<GLenum, 1> drawBuffers{
+        GL_COLOR_ATTACHMENT0 + finalAttachmentIndex,
+    };
+    glNamedFramebufferDrawBuffers(
+        framebuffer_.GetID(),
+        static_cast<GLsizei>(drawBuffers.size()),
+        drawBuffers.data());
+
     glDrawArrays(GL_TRIANGLES, 0, 6);
+    frameInfo_.DrawCalls++;
+}
+
+void Nova::Renderer::Draw(const Nova::FrameSettings &settings)
+{
+    ResizeFramebuffer(settings.FrameWidth, settings.FrameHeight);
+
+    GL::Viewport(0, 0, settings.FrameWidth, settings.FrameHeight);
+    GL::Scissor(0, 0, settings.FrameWidth, settings.FrameHeight);
+
+    frameInfo_.Width = settings.FrameWidth;
+    frameInfo_.Height = settings.FrameHeight;
+
+    textureBinder_.Update();
+    framebuffer_.Bind();
+    vertexArray_.Use();
+
+    ClearFramebuffer(settings.ClearColor);
+    WaitForFrameSync();
+
+    // commit materials data
+    materialsBufferData_.Commit();
+
+    // commit lights data
+    const auto pointLightsCount = static_cast<GLuint>(pointLightsData_.Commit());
+    const auto dirLightsCount = static_cast<GLuint>(dirLightsData_.Commit());
+
+    ExecuteGeometryPass();
+    ExecuteLightingPass(settings.AmbientColor, pointLightsCount, dirLightsCount);
+    ExecuteSkyboxPass(settings.SkyboxTexture);
+    ExecuteTransparentPass(settings.AmbientColor, pointLightsCount, dirLightsCount);
+    ExecuteFogPass(settings.FogColor);
 
     frameSync_.Set();
     framebuffer_.Unbind();
@@ -882,6 +983,15 @@ void Nova::Renderer::DisplayFramebuffer(const Window &window) const noexcept
         window.GetHeight(),
         GL_COLOR_BUFFER_BIT,
         GL_NEAREST);
+}
+
+void Nova::Renderer::BeginFrame() noexcept
+{
+    frameInfo_.DrawCalls = 0;
+}
+
+void Nova::Renderer::EndFrame() noexcept
+{
 }
 
 const Nova::FramebufferAttachment &Nova::Renderer::GetFramebufferAttachment(Nova::FramebufferAttachmentType type) const noexcept
@@ -945,7 +1055,10 @@ void Nova::Renderer::DrawBatch(const std::shared_ptr<Buffer> &modelBuffer, std::
         sizeof(ModelVertexData));
 
     // TODO If instance data transfer doesn't overlap the currently rendered region, dont synchronize, just get next region and use gldraw*baseinstance. synchronize all regions from previous frame before draw
-    instanceDataSync_.WaitClient(SyncTimeoutInfinite);
+    {
+        NV_PROFILE_SCOPE("::WaitForInstanceSync");
+        instanceDataSync_.WaitClient(SyncTimeoutInfinite);
+    }
 
     auto instanceDataRegion = instanceBuffer_.GetRegion<InstanceData>(0, sizeof(InstanceData) * maxInstanceCount);
     instanceDataRegion.Copy(instanceData);
@@ -961,4 +1074,6 @@ void Nova::Renderer::DrawBatch(const std::shared_ptr<Buffer> &modelBuffer, std::
         static_cast<GLsizei>(instanceData.size()));
 
     instanceDataSync_.Set();
+
+    frameInfo_.DrawCalls++;
 }

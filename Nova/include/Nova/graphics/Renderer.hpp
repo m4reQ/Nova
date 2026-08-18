@@ -82,12 +82,22 @@ namespace Nova
 
     struct FrameInfo
     {
-        Rect<unsigned int> Viewport;
-        Rect<unsigned int> Scissor;
-        unsigned int Width;
-        unsigned int Height;
-        size_t DrawCalls;
+        Rect<unsigned int> Viewport{};
+        Rect<unsigned int> Scissor{};
+        unsigned int Width = 0;
+        unsigned int Height = 0;
+        size_t DrawCalls = 0;
+        glm::vec4 ClearColor = glm::vec4(0.0f);
+    };
+
+    struct FrameSettings
+    {
+        std::shared_ptr<Texture> SkyboxTexture;
         glm::vec4 ClearColor;
+        glm::vec4 FogColor;
+        glm::vec4 AmbientColor;
+        unsigned int FrameWidth;
+        unsigned int FrameHeight;
     };
 
     enum class FramebufferAttachmentType : size_t
@@ -163,10 +173,11 @@ namespace Nova
             const glm::mat4 &transform,
             const glm::mat3 &transformNormal);
 
-        void Draw(
-            unsigned int frameWidth,
-            unsigned int frameHeight,
-            std::shared_ptr<Texture> skyboxTexture);
+        void Draw(const FrameSettings &frameSettings);
+
+        void BeginFrame() noexcept;
+
+        void EndFrame() noexcept;
 
         const FramebufferAttachment &GetFramebufferAttachment(FramebufferAttachmentType type) const noexcept;
 
@@ -208,8 +219,26 @@ namespace Nova
         glm::vec3 cameraPosition_;
 
         std::vector<InstanceData> &GetInstanceDataForModel(std::shared_ptr<Buffer> modelBuffer, bool useAlpha) noexcept;
+
         GLuint GetMaterialIndex(const Material &material);
+
         void DrawBatch(const std::shared_ptr<Buffer> &modelBuffer, std::span<const InstanceData> instanceData) noexcept;
+
+        void ResizeFramebuffer(unsigned int frameWidth, unsigned int frameHeight) noexcept;
+
+        void ClearFramebuffer(const glm::vec4 &clearColor) noexcept;
+
+        void WaitForFrameSync() noexcept;
+
+        void ExecuteGeometryPass() noexcept;
+
+        void ExecuteLightingPass(const glm::vec4 &ambientColor, unsigned int pointLightsCount, unsigned int dirLightsCount) noexcept;
+
+        void ExecuteSkyboxPass(const std::shared_ptr<Texture> &skyboxTexture) noexcept;
+
+        void ExecuteTransparentPass(const glm::vec4 &ambientColor, unsigned int pointLightsCount, unsigned int dirLightsCount) noexcept;
+
+        void ExecuteFogPass(const glm::vec4 &fogColor) noexcept;
     };
 
     constexpr bool operator==(const MaterialData &a, const MaterialData &b) noexcept
