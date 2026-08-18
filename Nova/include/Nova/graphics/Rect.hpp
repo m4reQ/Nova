@@ -5,6 +5,9 @@ namespace Nova
     template <typename TValue>
     struct Rect
     {
-        TValue X, Y, Width, Height;
+        TValue X{};
+        TValue Y{};
+        TValue Width{};
+        TValue Height{};
     };
 }
