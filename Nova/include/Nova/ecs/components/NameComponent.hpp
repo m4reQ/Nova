@@ -1,7 +1,10 @@
 #pragma once
 #include <string>
 
-struct NameComponent
+namespace Nova
 {
-    std::string Name;
-};
+    struct NameComponent
+    {
+        std::string Name;
+    };
+}
