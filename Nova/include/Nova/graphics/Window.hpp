@@ -1,6 +1,7 @@
 #pragma once
 #include <Nova/graphics/WindowData.hpp>
 #include <Nova/graphics/FullscreenMode.hpp>
+#include <Nova/graphics/Rect.hpp>
 #include <Nova/core/StartupData.hpp>
 #include <Nova/core/Flag.hpp>
 #include <Nova/events/EventSystem.hpp>
@@ -70,6 +71,8 @@ namespace Nova
 
         std::pair<int, int> GetSize() const noexcept;
 
+        Nova::Rect<unsigned int> GetViewport() const noexcept;
+
         float GetAspectRatio() const noexcept;
 
         int GetClientWidth() const noexcept;
@@ -79,6 +82,8 @@ namespace Nova
         float GetClientAspectRatio() const noexcept;
 
         std::pair<int, int> GetClientSize() const noexcept;
+
+        Nova::Rect<unsigned int> GetClientViewport() const noexcept;
 
         int GetX() const noexcept;
 

@@ -436,6 +436,16 @@ std::pair<int, int> Nova::Window::GetSize() const noexcept
     return WinRect::Window(data_.handle).GetSize();
 }
 
+Nova::Rect<unsigned int> Nova::Window::GetViewport() const noexcept
+{
+    return Nova::Rect<unsigned int>{
+        .X = 0,
+        .Y = 0,
+        .Width = static_cast<unsigned int>(GetWidth()),
+        .Height = static_cast<unsigned int>(GetHeight()),
+    };
+}
+
 float Nova::Window::GetAspectRatio() const noexcept
 {
     const auto [w, h] = GetSize();
@@ -461,6 +471,16 @@ float Nova::Window::GetClientAspectRatio() const noexcept
 {
     const auto [w, h] = GetClientSize();
     return w / static_cast<float>(h);
+}
+
+Nova::Rect<unsigned int> Nova::Window::GetClientViewport() const noexcept
+{
+    return Nova::Rect<unsigned int>{
+        .X = 0,
+        .Y = 0,
+        .Width = static_cast<unsigned int>(GetClientWidth()),
+        .Height = static_cast<unsigned int>(GetClientHeight()),
+    };
 }
 
 int Nova::Window::GetX() const noexcept
