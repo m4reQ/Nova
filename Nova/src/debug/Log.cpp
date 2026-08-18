@@ -17,11 +17,11 @@ void Nova::Log::_Initialize(const std::optional<std::filesystem::path> logFilepa
 
 	if (logFilepath.has_value())
 		sinks.emplace_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>(logFilepath.value().string(), true));
-	
+
 	s_Logger = std::make_shared<spdlog::logger>("NOVA", sinks.begin(), sinks.end());
 	s_Logger->set_pattern("%^[%l][%H:%M:%S.%e] %v%$");
-	s_Logger->set_level(spdlog::level::trace);
-	s_Logger->flush_on(spdlog::level::trace);
+	s_Logger->set_level(spdlog::level::info);
+	s_Logger->flush_on(spdlog::level::info);
 
 	spdlog::register_logger(s_Logger);
 }
