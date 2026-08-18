@@ -2,6 +2,7 @@
 #include <concepts>
 #include <limits>
 #include <memory>
+#include <stdexcept>
 
 // default_delete_for: gives the correct default_delete<T> or default_delete<T[]>
 template <typename T>
