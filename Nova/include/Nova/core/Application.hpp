@@ -11,8 +11,6 @@ namespace Nova
     class Application
     {
     public:
-        Application() = default;
-
         Application(const std::string_view name, const StartupData &startupData, const WindowSettings &windowSettings);
 
         Application(const Application &) = delete;
@@ -22,10 +20,6 @@ namespace Nova
         virtual ~Application() noexcept = default;
 
         void Run();
-
-        virtual void OnLoad() = 0;
-
-        virtual void OnClose() = 0;
 
         virtual void OnRender() = 0;
 
@@ -70,4 +64,12 @@ namespace Nova
         std::chrono::high_resolution_clock::time_point appStart_;
         double frametime_ = 0.001;
     };
+
+    template <typename T, typename... Args>
+        requires std::is_base_of_v<Application, T>
+    void Run(Args &&...args)
+    {
+        auto application = std::make_unique<T>(std::forward<Args>(args)...);
+        application->Run();
+    }
 }

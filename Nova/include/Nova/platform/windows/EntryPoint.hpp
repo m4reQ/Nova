@@ -10,7 +10,7 @@
 #include <iostream>
 #include <memory>
 
-extern std::unique_ptr<Nova::Application> CreateApplication(const Nova::StartupData &startupData);
+extern void RunApplication(const Nova::StartupData &startupData);
 
 static std::vector<std::string> GetArgs(int argc, char **argv) noexcept
 {
@@ -44,8 +44,7 @@ int main(int argc, char **argv)
             .args = GetArgs(argc, argv),
             .showCommand = SW_SHOWDEFAULT,
         };
-        auto application = CreateApplication(startupData);
-        application->Run();
+        RunApplication(startupData);
 #ifndef NV_DEBUG
     }
     catch (std::exception e)
@@ -78,8 +77,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdLine, int cmd
             .args = GetArgs(__argc, __argv),
             .showCommand = cmdShow,
         };
-        auto application = CreateApplication(startupData);
-        application->Run();
+        RunApplication(startupData);
 #ifndef NV_DEBUG
     }
     catch (std::exception e)

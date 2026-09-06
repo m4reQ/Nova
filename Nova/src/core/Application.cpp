@@ -23,11 +23,6 @@ Nova::Application::Application(const std::string_view name, const StartupData &s
 
 void Nova::Application::Run()
 {
-    {
-        NV_PROFILE_SCOPE("::Load");
-        OnLoad();
-    }
-
     while (!window_.ShouldClose())
     {
         NV_PROFILE_SCOPE("::ProcessFrame");
@@ -59,8 +54,6 @@ void Nova::Application::Run()
 
         frametime_ = GetDurationSeconds(frameStart, FrameClock::now());
     }
-
-    OnClose();
 }
 
 double Nova::Application::GetTime() const noexcept
